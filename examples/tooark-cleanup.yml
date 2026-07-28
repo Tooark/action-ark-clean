@@ -1,0 +1,47 @@
+name: Cleanup Old Docker Images
+on:
+  schedule: [{ cron: "0 3 * * 1" }]
+  workflow_dispatch:
+    inputs:
+      dry-run: { description: Plan only, type: boolean, default: true }
+permissions: { contents: read, packages: write }
+concurrency: { group: image-cleanup, cancel-in-progress: false }
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        package:
+          [
+            aws-cli,
+            gcloud-cli,
+            tofu,
+            tofu-aws,
+            tofu-gcloud,
+            tofu-aws-gcloud,
+            sonar-scanner,
+            trivy-hadolint,
+            dockerx,
+            security-scanner,
+            terraform,
+            terraform-aws,
+            terraform-gcloud,
+            terraform-aws-gcloud,
+          ]
+    steps:
+      - uses: Tooark/arklean@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: Tooark
+          owner-type: organization
+          package: ${{ matrix.package }}
+          dry-run: ${{ github.event_name != 'workflow_dispatch' || inputs.dry-run }}
+          ephemeral-retention-days: 30
+          untagged-retention-days: 7
+          keep-latest: 10
+          # Raised above the conservative defaults (20/25) on purpose: this
+          # matrix cleans large backlogs. Lower them once backlogs are gone.
+          max-deletions: 50
+          max-delete-percentage: 50
