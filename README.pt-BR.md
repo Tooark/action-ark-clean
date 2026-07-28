@@ -71,6 +71,8 @@ O bundle `dist/` commitado deve sempre corresponder a um build novo; o CI falha 
 
 As actions do CI são pinadas por SHA completo de commit. CodeQL, dependency review e Dependabot rodam a cada mudança. As releases são construídas a partir do fonte, verificadas quanto à reprodutibilidade do bundle e publicadas com checksums SHA-256, SBOM CycloneDX e atestado de proveniência de build; a tag móvel `v1` só é atualizada pelo workflow de release protegido. Consumidores com postura estrita devem pinar um SHA completo.
 
+Os controles de nível de repositório (branch protection, environment `release` protegido, secret scanning) estão pendentes até o repositório se tornar público — veja [docs/REPO-SETUP.md](docs/REPO-SETUP.md) para o status e os comandos exatos.
+
 ## Licença
 
 Apache-2.0.

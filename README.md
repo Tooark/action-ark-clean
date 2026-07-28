@@ -71,6 +71,8 @@ The committed `dist/` bundle must always match a fresh build; CI fails otherwise
 
 CI actions are pinned by full commit SHA. CodeQL, dependency review, and Dependabot run on every change. Releases are built from source, checked for bundle reproducibility, published with SHA-256 checksums, a CycloneDX SBOM, and build provenance attestation; the moving `v1` tag is only updated by the protected release workflow. Consumers with a strict posture should pin a full commit SHA.
 
+Repository-level controls (branch protection, protected `release` environment, secret scanning) are pending until the repository is public — see [docs/REPO-SETUP.md](docs/REPO-SETUP.md) for status and the exact commands.
+
 ## License
 
 Apache-2.0.
