@@ -1,0 +1,56 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: corepack enable
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test
+
+      # The committed bundle must be reproducible from source before anything ships
+      - run: pnpm build
+      - run: git add -A dist && git diff --cached --exit-code -- dist
+
+      - name: Generate checksums and SBOM
+        run: |
+          find dist action.yml -type f | sort | xargs sha256sum > SHA256SUMS.txt
+          node scripts/generate-sbom.mjs > sbom.cdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            dist/*.js
+            action.yml
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" SHA256SUMS.txt sbom.cdx.json \
+            --title "Arklean $GITHUB_REF_NAME" --generate-notes
+
+      # The moving major tag is only ever updated by this protected workflow
+      - name: Update moving major tag
+        run: |
+          major="${GITHUB_REF_NAME%%.*}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$major" "$GITHUB_REF_NAME"
+          git push -f origin "$major"

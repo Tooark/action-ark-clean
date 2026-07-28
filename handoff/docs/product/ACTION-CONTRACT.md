@@ -1,0 +1,121 @@
+# Action contract
+
+This is the implemented V0.x contract. It supersedes the original proposal: the
+safety inputs `confirm-delete`, `verify-inventory-before-apply`, and
+`delete-untagged` were added during implementation, and `fail-on-no-match` was
+renamed `fail-on-empty`. OCI graph protection (`protect-multi-arch`,
+`protect-referrers`) is implemented; orphan referrer cleanup remains reserved
+(see "Reserved").
+
+## Scope
+
+The package type is fixed to `container` in V1 (FR-001) and is not exposed as an input. A `package-type` input may be introduced by a future contract revision.
+
+## Permissions
+
+- Workflow token: `contents: read` and `packages: write`; deletion additionally requires that the target package grants the executing repository administrative Actions access, or a token (classic PAT or GitHub App) with package read/delete permission.
+- Dry-run requires only package read access.
+- Follow least privilege (R-005): prefer `GITHUB_TOKEN` with explicit package Actions access or a dedicated GitHub App over broad personal tokens.
+
+## Inputs
+
+Required:
+
+- `token`: token used only for GitHub API requests.
+- `owner`: organization or user owning the package.
+- `package`: exact GHCR package name in V1.
+
+Identity:
+
+- `owner-type`: `auto`, `organization`, or `user`; default `auto` (resolved through the GitHub API).
+
+Retention:
+
+- `protected-tags`: newline-separated exact values or `/regex/` expressions; defaults protect `latest`, `stable`, `production`, and SemVer tags.
+- `ephemeral-tags`: newline-separated exact values or `/regex/` expressions; defaults match commit SHAs, feature/fix/hotfix/chore/pr prefixes, and scan tags. Mutable branch tags (`main`, `master`, `develop`) are intentionally not ephemeral by default.
+- `ephemeral-retention-days`: default `30`.
+- `untagged-retention-days`: default `7`.
+- `keep-latest`: default `10`.
+- `delete-untagged`: default `false`.
+- `always-keep-newest`: default `true`.
+
+OCI safety:
+
+- `protect-multi-arch`: default `true`; protects platform children of retained multi-arch indexes by inspecting registry manifests.
+- `protect-referrers`: default `true`; protects referrers of retained versions via the OCI 1.1 `subject` field and the cosign `sha256-<digest>.<suffix>` tag scheme.
+
+When either flag is enabled and the plan has eligible versions, Arklean exchanges the token for a registry pull token and fetches one manifest per scanned version (bounded by `concurrency`, with retries). Versions whose manifest cannot be inspected fail closed as `PROTECTED_UNKNOWN_RELATION`; if a retained version's manifest is unknown, every eligible untagged version is also protected, because any of them could be its child.
+
+Safety:
+
+- `dry-run`: default `true`.
+- `confirm-delete`: required in apply mode; must equal `owner/package` exactly.
+- `verify-inventory-before-apply`: default `true`; re-reads the inventory and aborts before the first DELETE if it changed.
+- `validate-after-cleanup`: default `true`; re-reads the inventory after apply and fails the run if any protected version disappeared.
+- `max-deletions`: default `20`.
+- `max-delete-percentage`: default `25`.
+- `fail-on-empty`: default `false`; fails when the package has no versions (renamed from `fail-on-no-match`).
+
+Execution:
+
+- `concurrency`: default `2`, maximum `10`.
+- `retry-count`: default `3`, maximum `5`.
+
+## Outputs
+
+- `scanned`
+- `protected`
+- `eligible`
+- `deleted`
+- `absent`: versions already gone when deletion was attempted (HTTP 404); never counted as `deleted`.
+- `failed`
+- `plan-sha256`
+- `plan-path`
+- `result-path`: path of the JSON apply report; the empty string in dry-run.
+
+## Plan and report artifacts
+
+The JSON plan is always written, in both dry-run and apply modes, to a file under the runner temporary directory; `plan-path` reports its location and `plan-sha256` its canonical hash. In apply mode a JSON apply report is also written (`result-path`) recording, per attempted deletion, the outcome (`deleted`, `absent`, or `failed` with the error) plus aggregate counts and the post-apply validation status. No input controls artifact emission in V0.x. Uploading either file as a workflow artifact is a documented consumer step (Backlog F5).
+
+## Reason codes
+
+Stable machine-readable codes. Plan reason codes and apply outcomes are distinct namespaces: every version receives exactly one plan reason code (its final disposition, per the domain model), and versions whose deletion is attempted additionally receive one outcome in the apply report.
+
+Plan reason codes (one per version):
+
+- `PROTECTED_TAG`
+- `PROTECTED_NEWEST`
+- `PROTECTED_KEEP_LATEST`
+- `PROTECTED_TOO_RECENT`
+- `PROTECTED_UNMATCHED_TAG`: a tagged version matching no ephemeral rule is retained.
+- `PROTECTED_OCI_CHILD`: platform child of a retained index; `matchedRule` carries the parent digest.
+- `PROTECTED_OCI_REFERRER`: signature/attestation/SBOM referrer of a retained version; `matchedRule` carries the subject digest.
+- `PROTECTED_UNKNOWN_RELATION`: the relation could not be proven; fails closed per ADR-003 and ADR-005.
+- `ELIGIBLE_EPHEMERAL`
+- `ELIGIBLE_UNTAGGED`
+
+Apply outcomes (one per attempted deletion, recorded in the apply report without replacing the plan disposition): `deleted`, `absent`, `failed`.
+
+Run abort codes (run-level, reported in the failure message and Step Summary):
+
+- `ABORTED_BUDGET_EXCEEDED`: a safety budget (`max-deletions` or `max-delete-percentage`) was exceeded by the plan; aborts before any DELETE.
+- `ABORTED_NO_MATCH`: `fail-on-empty` is enabled and the package has no versions.
+- `ABORTED_INVENTORY_CHANGED`: the inventory changed between plan and apply; aborts before any DELETE.
+- `VALIDATION_FAILED`: post-apply validation found a protected version missing; the run fails even though deletions succeeded.
+
+## Reserved
+
+These names are reserved and not yet accepted; passing them has no effect:
+
+- Input `delete-orphaned-referrers` and plan reason code `ELIGIBLE_ORPHAN_REFERRER`: orphan referrer cleanup stays disabled until fixtures prove safety (Implementation Plan, Iteration 5).
+- Input `ignore-missing-on-delete`: 404 responses during deletion are always treated as idempotent success (`absent`), so the flag is currently unnecessary.
+- Output `estimated-reclaimed-bytes`: pending size metadata support.
+
+## Matching semantics
+
+- Blank lines and lines beginning with `#` are ignored.
+- `/.../` denotes a regular expression; all other values are exact tags.
+- Regexes are compiled once after validation.
+- Protected rules have precedence over every deletion rule.
+- Rules evaluate the complete tag set of a version.
+- Invalid patterns fail the action before discovery or deletion.

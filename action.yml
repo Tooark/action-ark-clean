@@ -1,0 +1,101 @@
+name: Arklean
+description: Safe, explainable lifecycle policies for GitHub Container Registry
+author: Tooark
+branding:
+  icon: trash-2
+  color: purple
+inputs:
+  token:
+    description: GitHub token with package administration permission
+    required: true
+  owner:
+    description: Organization or user owning the package
+    required: true
+  owner-type:
+    description: auto, organization, or user; auto resolves the owner type via the GitHub API
+    required: false
+    default: auto
+  package:
+    description: Exact GHCR package name
+    required: true
+  protected-tags:
+    description: Newline-separated exact tags or /regex/ expressions
+    required: false
+    default: |-
+      latest
+      stable
+      production
+      /^v?\d+(\.\d+){0,2}$/
+  ephemeral-tags:
+    description: >-
+      Newline-separated exact tags or /regex/ expressions eligible by age.
+      Mutable branch tags (main, master, develop) are intentionally not
+      ephemeral by default because they may point at the image currently in
+      use; add them explicitly if you understand the risk.
+    required: false
+    default: |-
+      /^sha-[0-9a-f]{7,40}$/
+      /^[0-9a-f]{7,40}$/
+      /^(feature|fix|hotfix|chore|pr)[-_].+$/
+      /^scan-.+$/
+  ephemeral-retention-days:
+    description: Minimum age for ephemeral tagged versions
+    default: "30"
+  untagged-retention-days:
+    description: Minimum age for untagged versions
+    default: "7"
+  keep-latest:
+    description: Number of newest otherwise eligible tagged versions to retain
+    default: "10"
+  delete-untagged:
+    description: Permit deletion of old untagged versions; disabled by default until OCI inspection is available
+    default: "false"
+  always-keep-newest:
+    description: Always preserve the newest package version
+    default: "true"
+  protect-multi-arch:
+    description: Protect platform children of retained multi-arch indexes via registry manifests
+    default: "true"
+  protect-referrers:
+    description: Protect signatures, attestations, and SBOM referrers of retained versions
+    default: "true"
+  dry-run:
+    description: Plan only; no DELETE requests
+    default: "true"
+  confirm-delete:
+    description: Required in apply mode; must equal owner/package
+    default: ""
+  fail-on-empty:
+    description: Fail when the package has no versions
+    default: "false"
+  verify-inventory-before-apply:
+    description: Re-read inventory and abort if it changed before deletion
+    default: "true"
+  validate-after-cleanup:
+    description: Re-read inventory after apply and fail if any protected version disappeared
+    default: "true"
+  max-deletions:
+    description: Absolute deletion safety budget
+    default: "20"
+  max-delete-percentage:
+    description: Percentage deletion safety budget
+    default: "25"
+  concurrency:
+    description: Concurrent DELETE requests from 1 to 10
+    default: "2"
+  retry-count:
+    description: Retries for transient API failures from 0 to 5
+    default: "3"
+outputs:
+  scanned: { description: Number of versions scanned }
+  protected: { description: Number of versions retained }
+  eligible: { description: Number eligible for deletion }
+  deleted: { description: Number deleted }
+  absent: { description: Number already absent when deletion was attempted }
+  failed: { description: Number whose deletion failed }
+  plan-sha256: { description: SHA-256 of the canonical cleanup plan }
+  plan-path: { description: Path to the JSON plan }
+  result-path: { description: Path to the JSON apply report; empty in dry-run }
+runs:
+  using: node24
+  main: dist/main.js
