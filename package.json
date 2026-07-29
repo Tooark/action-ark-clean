@@ -7,7 +7,7 @@
   "engines": {
     "node": ">=24"
   },
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@11.18.0",
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-dist.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

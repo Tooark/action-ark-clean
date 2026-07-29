@@ -6,8 +6,19 @@ import { gatherOciEvidence } from "./oci.js";
 import { assertBudget, buildPlan, planHash, protectOciRelations } from "./policy.js";
 import type { ApplyReport, ApplyResult, ResolvedConfig } from "./types.js";
 
+/**
+ * Sanitiza um fragmento de nome de pacote para uso seguro em nomes de arquivo.
+ * @param name Fragmento de nome a ser sanitizado.
+ * @returns Nome sanitizado, com caracteres inválidos substituídos por `_`.
+ * @remarks Apenas caracteres alfanuméricos, `-`, `_` e `.` são preservados.
+ * Todos os outros são substituídos por `_`.
+ */
 const sanitize = (name: string): string => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
+/**
+ * Orquestra o fluxo completo da action:
+ * configuração, planejamento, apply opcional, outputs e resumo.
+ */
 export async function run(): Promise<void> {
   const loaded = loadConfig();
   const c: ResolvedConfig = {
@@ -17,18 +28,24 @@ export async function run(): Promise<void> {
   info(`Arklean: evaluating ${c.owner}/${c.packageName}`);
 
   const versions = await listVersions(c);
-  if (c.failOnEmpty && versions.length === 0) throw new Error("ABORTED_NO_MATCH: package contains no versions");
+  if (c.failOnEmpty && versions.length === 0) {
+    throw new Error("ABORTED_NO_MATCH: package contains no versions");
+  }
 
   let plan = buildPlan(c, versions);
   if ((c.protectMultiArch || c.protectReferrers) && plan.counts.eligible > 0) {
     const evidence = await gatherOciEvidence(c, versions);
-    if (evidence.unknown.size > 0)
+    if (evidence.unknown.size > 0) {
       warning(`OCI inspection incomplete for ${evidence.unknown.size} version(s); unknown relations fail closed`);
+    }
     plan = protectOciRelations(plan, evidence, c);
   }
+
   const hash = planHash(plan);
   const dir = process.env.RUNNER_TEMP || process.cwd();
   const planPath = `${dir}/arklean-plan-${sanitize(c.packageName)}.json`;
+
+  // O plano é gravado antes do check de budget para que um abort ainda deixe o artefato de auditoria.
   await save(planPath, JSON.stringify({ ...plan, planSha256: hash }, null, 2));
   assertBudget(c, plan);
 
@@ -44,22 +61,31 @@ export async function run(): Promise<void> {
     warning(`Dry-run enabled: ${eligible.length} versions would be deleted`);
   } else {
     const expected = `${c.owner}/${c.packageName}`;
-    if (c.confirmDelete !== expected) throw new Error(`Apply mode requires confirm-delete to equal ${expected}`);
+    if (c.confirmDelete !== expected) {
+      throw new Error(`Apply mode requires confirm-delete to equal ${expected}`);
+    }
+
     if (c.verifyInventoryBeforeApply) {
+      // Replaneja com o relógio original (evaluatedAt) para que só mudanças reais de
+      // inventário — nunca o tempo decorrido — alterem o fingerprint comparado.
       const current = await listVersions(c);
       const replan = buildPlan(c, current, new Date(plan.evaluatedAt));
-      if (replan.inventoryFingerprint !== plan.inventoryFingerprint)
+      if (replan.inventoryFingerprint !== plan.inventoryFingerprint) {
         throw new Error(
           "ABORTED_INVENTORY_CHANGED: package inventory changed between plan and apply; aborting before deletion",
         );
+      }
     }
 
     const startedAt = new Date().toISOString();
     await pool(eligible, c.concurrency, async (d) => {
       try {
         const outcome = await deleteVersion(c, d.versionId);
-        if (outcome === "deleted") deleted++;
-        else absent++;
+        if (outcome === "deleted") {
+          deleted++;
+        } else {
+          absent++;
+        }
         results.push({ versionId: d.versionId, digest: d.digest, outcome });
       } catch (e) {
         failed++;
@@ -73,6 +99,8 @@ export async function run(): Promise<void> {
         warning(message);
       }
     });
+
+    // A exclusão é concorrente; ordenar por versionId mantém o relatório determinístico.
     results.sort((a, b) => a.versionId - b.versionId);
 
     if (c.validateAfterCleanup) {
@@ -82,7 +110,9 @@ export async function run(): Promise<void> {
         (d) => d.disposition === "protected" && !remaining.has(d.versionId),
       );
       validation = missingProtected.length === 0 ? "passed" : "failed";
-      for (const d of missingProtected) warning(`Validation: protected version ${d.versionId} is no longer present`);
+      for (const d of missingProtected) {
+        warning(`Validation: protected version ${d.versionId} is no longer present`);
+      }
     }
 
     const report: ApplyReport = {
@@ -127,9 +157,12 @@ export async function run(): Promise<void> {
       `> OCI: multi-arch children and referrers of retained versions are protected via registry manifests when enabled; unknown relations fail closed. Orphan referrer cleanup is not yet implemented.\n`,
   );
 
-  if (failed > 0) throw new Error(`${failed} deletion(s) failed`);
-  if (validation === "failed")
+  if (failed > 0) {
+    throw new Error(`${failed} deletion(s) failed`);
+  }
+  if (validation === "failed") {
     throw new Error("VALIDATION_FAILED: at least one protected version disappeared during apply");
+  }
 }
 
 run().catch((e) => fail(e instanceof Error ? e.message : "Unexpected Arklean failure"));

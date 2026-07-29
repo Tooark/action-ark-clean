@@ -1,27 +1,68 @@
 import { input, mask } from "./io.js";
 import type { Config, Rule } from "./types.js";
 
+/**
+ * Valida e converte um input numérico inteiro dentro de uma faixa inclusiva.
+ * @param name Nome do input para mensagens de erro.
+ * @param value Valor textual do input.
+ * @param min Valor mínimo permitido (inclusive).
+ * @param max Valor máximo permitido (inclusive).
+ * @returns O valor convertido para número.
+ * @throws Erro se o valor não for um inteiro ou estiver fora da faixa.
+ */
 function integer(name: string, value: string, min: number, max: number): number {
-  if (!/^\d+$/.test(value)) throw new Error(`${name} must be an integer`);
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${name} must be an integer`);
+  }
+
   const n = Number(value);
-  if (n < min || n > max) throw new Error(`${name} must be between ${min} and ${max}`);
+  if (n < min || n > max) {
+    throw new Error(`${name} must be between ${min} and ${max}`);
+  }
+
   return n;
 }
 
+/**
+ * Valida e converte um input booleano textual; aceita apenas `true` ou `false`.
+ * @param name Nome do input para mensagens de erro.
+ * @param value Valor textual do input.
+ * @returns O valor convertido para booleano.
+ * @throws Erro se o valor não for `true` ou `false`.
+ */
 function bool(name: string, value: string): boolean {
-  if (value === "true") return true;
-  if (value === "false") return false;
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
   throw new Error(`${name} must be true or false`);
 }
 
+/**
+ * Analisa regras de tags de uma string multilinha: cada linha é uma correspondência
+ * exata ou uma regex delimitada por `/.../`; linhas vazias e comentários `#` são ignorados.
+ * Limites de 50 regras e 256 caracteres por regra contêm inputs abusivos.
+ * @param value Valor textual do input.
+ * @returns Lista de regras de tags.
+ * @throws Erro se alguma regra for inválida ou exceder os limites.
+ */
 export function rules(value: string): Rule[] {
   const lines = value
     .split(/\r?\n/)
     .map((x) => x.trim())
     .filter((x) => x && !x.startsWith("#"));
-  if (lines.length > 50) throw new Error("No more than 50 tag rules are allowed");
+
+  if (lines.length > 50) {
+    throw new Error("No more than 50 tag rules are allowed");
+  }
+
   return lines.map((line) => {
-    if (line.length > 256) throw new Error("Tag rule exceeds 256 characters");
+    if (line.length > 256) {
+      throw new Error("Tag rule exceeds 256 characters");
+    }
+
     if (line.startsWith("/") && line.endsWith("/") && line.length > 2) {
       const source = line.slice(1, -1);
       try {
@@ -30,16 +71,28 @@ export function rules(value: string): Rule[] {
         throw new Error(`Invalid regular expression: ${line}`);
       }
     }
+
     return { kind: "exact", value: line };
   });
 }
 
+/**
+ * Carrega e valida todos os inputs da action antes de qualquer acesso à rede,
+ * retornando uma configuração tipada.
+ * @returns Configuração completa da action.
+ * @throws Erro se algum input for inválido ou ausente.
+ */
 export function loadConfig(): Config {
   const token = input("token", true);
+
+  // Mascara o token imediatamente, antes de qualquer log possível.
   mask(token);
+
   const ownerType = input("owner-type") || "auto";
-  if (ownerType !== "auto" && ownerType !== "organization" && ownerType !== "user")
+  if (ownerType !== "auto" && ownerType !== "organization" && ownerType !== "user") {
     throw new Error("owner-type must be auto, organization, or user");
+  }
+
   return {
     token,
     owner: input("owner", true),

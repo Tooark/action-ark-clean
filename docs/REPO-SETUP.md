@@ -1,7 +1,7 @@
 # Repository setup — pending items
 
 Tracks the repository-level security controls required by
-[SUPPLY-CHAIN.md](../handoff/docs/security/SUPPLY-CHAIN.md). Some are applied;
+[SUPPLY-CHAIN.md](security/SUPPLY-CHAIN.md). Some are applied;
 the rest are **blocked only because the repository is private on the free
 plan**. Arklean is Apache-2.0 and the GitHub Marketplace requires a public
 repository anyway, so the pending items below must be resolved **as soon as the
@@ -39,7 +39,7 @@ plan or a public repository):
 1. Make the repository public when ready:
 
    ```bash
-   gh repo edit Tooark/action-arklean --visibility public --accept-visibility-change-consequences
+   gh repo edit Tooark/action-ark-clean --visibility public --accept-visibility-change-consequences
    ```
 
 2. Apply branch protection:
@@ -57,7 +57,7 @@ plan or a public repository):
      "required_conversation_resolution": true
    }
    JSON
-   gh api -X PUT repos/Tooark/action-arklean/branches/main/protection --input /tmp/protection.json
+   gh api -X PUT repos/Tooark/action-ark-clean/branches/main/protection --input /tmp/protection.json
    ```
 
    Note: `required_pull_request_reviews` is intentionally null while there is a
@@ -69,13 +69,13 @@ plan or a public repository):
 
    ```bash
    printf '{"reviewers":[{"type":"User","id":%s}]}' "$(gh api user --jq .id)" > /tmp/env.json
-   gh api -X PUT repos/Tooark/action-arklean/environments/release --input /tmp/env.json
+   gh api -X PUT repos/Tooark/action-ark-clean/environments/release --input /tmp/env.json
    ```
 
 4. Enable secret scanning and push protection:
 
    ```bash
-   gh api -X PATCH repos/Tooark/action-arklean --input - <<'JSON'
+   gh api -X PATCH repos/Tooark/action-ark-clean --input - <<'JSON'
    {
      "security_and_analysis": {
        "secret_scanning": { "status": "enabled" },

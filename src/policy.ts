@@ -1,143 +1,184 @@
 import { createHash } from "node:crypto";
 import type { Config, Decision, OciEvidence, PackageVersion, Plan, Reason, ResolvedConfig, Rule } from "./types.js";
 
+/**
+ * Tempo de um dia em milissegundos, usado para cálculos de idade de versões.
+ */
 const DAY = 86400000;
+
+/**
+ * Esquema de tag de assinatura Cosign: `sha256-<digest>` com sufixo opcional (`.sig`, `.att`, `.sbom`).
+ */
+const COSIGN_TAG = /^sha256-([0-9a-f]{64})(\..+)?$/;
 
 const hash = (s: string): string => createHash("sha256").update(s).digest("hex");
 
+/**
+ * Retorna o valor da primeira regra que casa com qualquer uma das tags,
+ * ou `undefined` quando nenhuma regra corresponde.
+ * @param tags Lista de tags da versão.
+ * @param rules Lista de regras de tag a avaliar.
+ * @returns Valor da primeira regra correspondente, ou `undefined`.
+ * @remarks Regras exatas têm precedência sobre regex; a ordem das regras é respeitada.
+ */
 function match(tags: string[], rules: Rule[]): string | undefined {
-  for (const rule of rules)
-    for (const tag of tags) if (rule.kind === "exact" ? tag === rule.value : rule.regex.test(tag)) return rule.value;
+  for (const rule of rules) {
+    for (const tag of tags) {
+      if (rule.kind === "exact" ? tag === rule.value : rule.regex.test(tag)) {
+        return rule.value;
+      }
+    }
+  }
   return undefined;
 }
 
-export function buildPlan(c: ResolvedConfig, versions: PackageVersion[], now = new Date()): Plan {
+/**
+ * Constrói o plano de limpeza: uma decisão auditável por versão, com reason code estável.
+ * @param config Configuração resolvida com as regras e parâmetros de política.
+ * @param versions Versões do pacote a avaliar.
+ * @param now Relógio injetado para manter o motor determinístico (default: agora).
+ * @returns Plano de limpeza completo, com decisões por versão e contadores agregados.
+ */
+export function buildPlan(config: ResolvedConfig, versions: PackageVersion[], now = new Date()): Plan {
   const decisions: Decision[] = [];
   const otherwiseEligible: Decision[] = [];
 
-  for (const v of versions) {
-    const protectedRule = match(v.tags, c.protectedRules);
+  for (const version of versions) {
+    const protectedRule = match(version.tags, config.protectedRules);
     if (protectedRule) {
       decisions.push({
-        versionId: v.id,
-        digest: v.name,
-        tags: [...v.tags].sort(),
-        createdAt: v.createdAt,
+        versionId: version.id,
+        digest: version.name,
+        tags: [...version.tags].sort(),
+        createdAt: version.createdAt,
         disposition: "protected",
         reason: "PROTECTED_TAG",
         matchedRule: protectedRule,
       });
       continue;
     }
-    const age = (now.getTime() - new Date(v.createdAt).getTime()) / DAY;
-    if (v.tags.length === 0) {
-      if (c.deleteUntagged && age >= c.untaggedDays)
+
+    const age = (now.getTime() - new Date(version.createdAt).getTime()) / DAY;
+
+    if (version.tags.length === 0) {
+      if (config.deleteUntagged && age >= config.untaggedDays)
         otherwiseEligible.push({
-          versionId: v.id,
-          digest: v.name,
+          versionId: version.id,
+          digest: version.name,
           tags: [],
-          createdAt: v.createdAt,
+          createdAt: version.createdAt,
           disposition: "eligible",
           reason: "ELIGIBLE_UNTAGGED",
         });
       else
         decisions.push({
-          versionId: v.id,
-          digest: v.name,
+          versionId: version.id,
+          digest: version.name,
           tags: [],
-          createdAt: v.createdAt,
+          createdAt: version.createdAt,
           disposition: "protected",
           reason: "PROTECTED_TOO_RECENT",
         });
       continue;
     }
-    const ephemeral = match(v.tags, c.ephemeralRules);
+
+    const ephemeral = match(version.tags, config.ephemeralRules);
     if (!ephemeral) {
       decisions.push({
-        versionId: v.id,
-        digest: v.name,
-        tags: [...v.tags].sort(),
-        createdAt: v.createdAt,
+        versionId: version.id,
+        digest: version.name,
+        tags: [...version.tags].sort(),
+        createdAt: version.createdAt,
         disposition: "protected",
         reason: "PROTECTED_UNMATCHED_TAG",
       });
       continue;
     }
-    if (age < c.ephemeralDays) {
+
+    if (age < config.ephemeralDays) {
       decisions.push({
-        versionId: v.id,
-        digest: v.name,
-        tags: [...v.tags].sort(),
-        createdAt: v.createdAt,
+        versionId: version.id,
+        digest: version.name,
+        tags: [...version.tags].sort(),
+        createdAt: version.createdAt,
         disposition: "protected",
         reason: "PROTECTED_TOO_RECENT",
         matchedRule: ephemeral,
       });
       continue;
     }
+
     otherwiseEligible.push({
-      versionId: v.id,
-      digest: v.name,
-      tags: [...v.tags].sort(),
-      createdAt: v.createdAt,
+      versionId: version.id,
+      digest: version.name,
+      tags: [...version.tags].sort(),
+      createdAt: version.createdAt,
       disposition: "eligible",
       reason: "ELIGIBLE_EPHEMERAL",
       matchedRule: ephemeral,
     });
   }
 
+  // Desempate por versionId para que versões criadas no mesmo instante ordenem de forma estável.
   const tagged = otherwiseEligible
     .filter((x) => x.tags.length > 0)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.versionId - a.versionId);
-  const keepLatestIds = new Set(tagged.slice(0, c.keepLatest).map((x) => x.versionId));
+  const keepLatestIds = new Set(tagged.slice(0, config.keepLatest).map((x) => x.versionId));
 
   let newestId: number | undefined;
-  if (c.alwaysKeepNewest && versions.length > 0) {
+  if (config.alwaysKeepNewest && versions.length > 0) {
     const newest = [...versions].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id)[0];
-    if (newest) newestId = newest.id;
+    if (newest) {
+      newestId = newest.id;
+    }
   }
 
-  for (const d of otherwiseEligible) {
-    if (keepLatestIds.has(d.versionId))
+  for (const eligible of otherwiseEligible) {
+    if (keepLatestIds.has(eligible.versionId))
       decisions.push({
-        ...d,
+        ...eligible,
         disposition: "protected",
         reason: "PROTECTED_KEEP_LATEST",
       });
-    else if (d.versionId === newestId)
-      decisions.push({
-        ...d,
-        disposition: "protected",
-        reason: "PROTECTED_NEWEST",
-      });
-    else decisions.push(d);
+    else {
+      if (eligible.versionId === newestId) {
+        decisions.push({
+          ...eligible,
+          disposition: "protected",
+          reason: "PROTECTED_NEWEST",
+        });
+      } else {
+        decisions.push(eligible);
+      }
+    }
   }
 
   decisions.sort((a, b) => a.versionId - b.versionId);
 
   const policy = {
-    protected: c.protectedRules.map((x) => x.value),
-    ephemeral: c.ephemeralRules.map((x) => x.value),
-    ephemeralDays: c.ephemeralDays,
-    untaggedDays: c.untaggedDays,
-    keepLatest: c.keepLatest,
-    deleteUntagged: c.deleteUntagged,
-    alwaysKeepNewest: c.alwaysKeepNewest,
+    protected: config.protectedRules.map((x) => x.value),
+    ephemeral: config.ephemeralRules.map((x) => x.value),
+    ephemeralDays: config.ephemeralDays,
+    untaggedDays: config.untaggedDays,
+    keepLatest: config.keepLatest,
+    deleteUntagged: config.deleteUntagged,
+    alwaysKeepNewest: config.alwaysKeepNewest,
   };
+
   const inventory = versions
-    .map((v) => ({
-      id: v.id,
-      name: v.name,
-      tags: [...v.tags].sort(),
-      createdAt: v.createdAt,
+    .map((version) => ({
+      id: version.id,
+      name: version.name,
+      tags: [...version.tags].sort(),
+      createdAt: version.createdAt,
     }))
     .sort((a, b) => a.id - b.id);
 
   return {
     schemaVersion: 1,
-    owner: c.owner,
-    ownerType: c.ownerType,
-    package: c.packageName,
+    owner: config.owner,
+    ownerType: config.ownerType,
+    package: config.packageName,
     evaluatedAt: now.toISOString(),
     inventoryFingerprint: hash(JSON.stringify(inventory)),
     policyFingerprint: hash(JSON.stringify(policy)),
@@ -150,18 +191,26 @@ export function buildPlan(c: ResolvedConfig, versions: PackageVersion[], now = n
   };
 }
 
-const COSIGN_TAG = /^sha256-([0-9a-f]{64})(\..+)?$/;
-
-// Propagate OCI protection from retained versions: index children, referrer
-// subjects (OCI 1.1 `subject` field and cosign sha256-<digest>.<suffix> tag
-// scheme), and unknown relations, which fail closed (ADR-003/ADR-005).
-// Iterates to a fixpoint so a protected referrer's own children are also kept.
+/**
+ * Propaga proteção OCI a partir das versões retidas.
+ * @param plan Plano de limpeza com decisões iniciais.
+ * @param evidence Evidência de relações OCI: filhos de multi-arch e subjects de referrers.
+ * @param config Configuração com flags de proteção de multi-arch e referrers.
+ * @returns Plano atualizado com decisões protegidas propagadas a partir das relações OCI.
+ * @remarks Filhos de índices multi-arch, subjects de referrers (campo `subject`
+ * do OCI 1.1 e esquema de tag Cosign `sha256-<digest>.<sufixo>`) e relações
+ * desconhecidas, que falham fechado (ADR-003/ADR-005). Itera até um ponto fixo
+ * para que os próprios filhos de um referrer protegido também sejam retidos.
+ */
 export function protectOciRelations(
   plan: Plan,
   evidence: OciEvidence,
-  c: Pick<Config, "protectMultiArch" | "protectReferrers">,
+  config: Pick<Config, "protectMultiArch" | "protectReferrers">,
 ): Plan {
-  if (!c.protectMultiArch && !c.protectReferrers) return plan;
+  if (!config.protectMultiArch && !config.protectReferrers) {
+    return plan;
+  }
+
   const decisions = plan.decisions.map((d) => ({ ...d }));
 
   let changed = true;
@@ -169,29 +218,33 @@ export function protectOciRelations(
     changed = false;
     const retained = new Set(decisions.filter((d) => d.disposition === "protected").map((d) => d.digest));
     const retainedHasUnknown =
-      c.protectMultiArch && decisions.some((d) => d.disposition === "protected" && evidence.unknown.has(d.digest));
+      config.protectMultiArch && decisions.some((d) => d.disposition === "protected" && evidence.unknown.has(d.digest));
 
-    for (const d of decisions) {
-      if (d.disposition !== "eligible") continue;
+    for (const decision of decisions) {
+      if (decision.disposition !== "eligible") {
+        continue;
+      }
+
       let reason: Reason | undefined;
       let relatedTo: string | undefined;
 
-      if (c.protectMultiArch) {
+      if (config.protectMultiArch) {
         for (const parent of retained) {
-          if (evidence.children.get(parent)?.includes(d.digest)) {
+          if (evidence.children.get(parent)?.includes(decision.digest)) {
             reason = "PROTECTED_OCI_CHILD";
             relatedTo = parent;
             break;
           }
         }
       }
-      if (!reason && c.protectReferrers) {
-        const subject = evidence.subjects.get(d.digest);
+
+      if (!reason && config.protectReferrers) {
+        const subject = evidence.subjects.get(decision.digest);
         if (subject && retained.has(subject)) {
           reason = "PROTECTED_OCI_REFERRER";
           relatedTo = subject;
         } else {
-          for (const tag of d.tags) {
+          for (const tag of decision.tags) {
             const m = tag.match(COSIGN_TAG);
             if (m && retained.has(`sha256:${m[1]}`)) {
               reason = "PROTECTED_OCI_REFERRER";
@@ -201,14 +254,23 @@ export function protectOciRelations(
           }
         }
       }
-      // Fail closed: no proof this version is safe to delete.
-      if (!reason && evidence.unknown.has(d.digest)) reason = "PROTECTED_UNKNOWN_RELATION";
-      if (!reason && retainedHasUnknown && d.tags.length === 0) reason = "PROTECTED_UNKNOWN_RELATION";
+
+      // Falha fechado: sem prova de que esta versão é segura de excluir.
+      if (!reason && evidence.unknown.has(decision.digest)) {
+        reason = "PROTECTED_UNKNOWN_RELATION";
+      }
+
+      // Se algum índice retido não pôde ser inspecionado, qualquer untagged pode ser filho dele.
+      if (!reason && retainedHasUnknown && decision.tags.length === 0) {
+        reason = "PROTECTED_UNKNOWN_RELATION";
+      }
 
       if (reason) {
-        d.disposition = "protected";
-        d.reason = reason;
-        if (relatedTo) d.matchedRule = relatedTo;
+        decision.disposition = "protected";
+        decision.reason = reason;
+        if (relatedTo) {
+          decision.matchedRule = relatedTo;
+        }
         changed = true;
       }
     }
@@ -225,16 +287,34 @@ export function protectOciRelations(
   };
 }
 
-// Determinism contract: the plan object is always constructed with the same key
-// order and with decisions/tags/inventory sorted, so JSON.stringify is stable.
+/**
+ * Calcula o SHA-256 do plano.
+ * @param plan Plano de limpeza a ser hasheado.
+ * @returns SHA-256 do JSON do plano.
+ * @remarks Contrato de determinismo: o plano é sempre construído com a mesma ordem de chaves
+ * e com decisões/tags/inventário ordenados, então o JSON.stringify é estável.
+ */
 export function planHash(plan: Plan): string {
   return hash(JSON.stringify(plan));
 }
 
-export function assertBudget(c: Config, p: Plan): void {
-  const n = p.counts.eligible;
-  const pct = p.counts.scanned === 0 ? 0 : (n / p.counts.scanned) * 100;
-  if (n > c.maxDeletions) throw new Error(`ABORTED_BUDGET_EXCEEDED: ${n} deletions > max-deletions ${c.maxDeletions}`);
-  if (pct > c.maxDeletePercentage)
-    throw new Error(`ABORTED_BUDGET_EXCEEDED: ${pct.toFixed(1)}% > max-delete-percentage ${c.maxDeletePercentage}%`);
+/**
+ * Aborta com `ABORTED_BUDGET_EXCEEDED` quando o plano excede o limite absoluto
+ * (`max-deletions`) ou percentual (`max-delete-percentage`) de exclusões.
+ * @param config Configuração com limites de exclusão.
+ * @param plan Plano de limpeza a ser avaliado.
+ * @throws Erro se o plano exceder algum limite.
+ */
+export function assertBudget(config: Config, plan: Plan): void {
+  const eligibleCount = plan.counts.eligible;
+  const pct = plan.counts.scanned === 0 ? 0 : (eligibleCount / plan.counts.scanned) * 100;
+
+  if (eligibleCount > config.maxDeletions) {
+    throw new Error(`ABORTED_BUDGET_EXCEEDED: ${eligibleCount} deletions > max-deletions ${config.maxDeletions}`);
+  }
+  if (pct > config.maxDeletePercentage) {
+    throw new Error(
+      `ABORTED_BUDGET_EXCEEDED: ${pct.toFixed(1)}% > max-delete-percentage ${config.maxDeletePercentage}%`,
+    );
+  }
 }

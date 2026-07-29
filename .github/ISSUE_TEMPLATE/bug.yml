@@ -1,0 +1,24 @@
+name: Bug report
+description: Report non-sensitive incorrect behavior
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens or private package metadata. Report security issues privately.
+  - type: input
+    id: version
+    attributes:
+      label: Arklean version or commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed and expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: redacted
+    attributes:
+      label: Redacted configuration and logs
