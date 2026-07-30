@@ -31,7 +31,7 @@ jobs:
             terraform-aws-gcloud,
           ]
     steps:
-      - uses: Tooark/action-ark-clean@v1
+      - uses: Tooark/action-ark-clean@v0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: Tooark

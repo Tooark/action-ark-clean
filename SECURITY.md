@@ -30,7 +30,7 @@ Please include:
 Examples of reports we want to receive privately: suspected token exposure in
 logs or artifacts, a policy or OCI-graph flaw that deletes a version that should
 have been protected, workflow-command injection through package metadata, and
-any compromise of the release pipeline or the `v1` moving tag.
+any compromise of the release pipeline or the moving major tag.
 
 ### What to expect
 
@@ -45,17 +45,17 @@ We follow the principles of
 [Coordinated Vulnerability Disclosure (CVD)](https://en.wikipedia.org/wiki/Coordinated_vulnerability_disclosure).
 
 Because Arklean is destructive, a security fix may require immediate consumer
-action: rotating the moving `v1` tag and asking consumers pinned to a SHA or
+action: rotating the moving major tag and asking consumers pinned to a SHA or
 SemVer tag to update. Advisories will state explicitly when a pin update is
 required.
 
 ## Supported versions
 
-| Version                          | Supported                                  |
-| -------------------------------- | ------------------------------------------ |
-| Latest release (`v1` moving tag) | ✅ Receives security fixes                 |
-| Older SemVer tags / pinned SHAs  | ❌ Update your pin to the latest release   |
-| `main` (unreleased)              | ❌ Not intended for production consumption |
+| Version                                 | Supported                                 |
+| --------------------------------------- | ----------------------------------------- |
+| Latest release (moving major tag, `v0`) | ✅ Receives security fixes                 |
+| Older SemVer tags / pinned SHAs         | ❌ Update your pin to the latest release   |
+| `main` (unreleased)                     | ❌ Not intended for production consumption |
 
 Always update to the latest release before reporting a bug or vulnerability.
 

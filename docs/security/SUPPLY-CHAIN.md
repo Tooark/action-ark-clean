@@ -21,7 +21,7 @@
 ## Release controls
 
 - SemVer immutable tag such as `v1.0.0`.
-- Moving major tag `v1` updated only by a protected release workflow.
+- Moving major tag (e.g. `v0`, `v1`) updated only by a protected release workflow.
 - GitHub release notes and checksums.
 - Artifact attestation/provenance and optional keyless signing.
 - Marketplace release from the public dedicated repository.

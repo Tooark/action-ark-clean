@@ -1,0 +1,64 @@
+# Every input Arklean supports, set to its default value, with a short note.
+# Only token, owner, and package are required — copy just what you need.
+# Normative reference: docs/product/ACTION-CONTRACT.md
+name: Cleanup GHCR (all options)
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run: { description: Plan only, type: boolean, default: true }
+permissions:
+  contents: read
+  packages: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Tooark/action-ark-clean@v0
+        with:
+          # ── Required ─────────────────────────────────────────────────────
+          token: ${{ secrets.GITHUB_TOKEN }} # needs package admin for apply
+          owner: ${{ github.repository_owner }}
+          package: my-image # exact GHCR package name
+
+          # ── Identity ─────────────────────────────────────────────────────
+          owner-type: auto # auto | organization | user
+
+          # ── Retention policy ─────────────────────────────────────────────
+          # Exact tags or /regex/, one per line; '#' starts a comment line.
+          # A matching protected tag retains the whole package version.
+          protected-tags: |
+            latest
+            stable
+            production
+            /^v?\d+(\.\d+){0,2}$/
+          # Matching tags become deletion candidates once old enough.
+          # Mutable branch tags (main, master, develop) are intentionally NOT
+          # ephemeral by default — add them only if you understand the risk.
+          ephemeral-tags: |
+            /^sha-[0-9a-f]{7,40}$/
+            /^[0-9a-f]{7,40}$/
+            /^(feature|fix|hotfix|chore|pr)[-_].+$/
+            /^scan-.+$/
+          ephemeral-retention-days: 30 # min age for ephemeral tagged versions
+          untagged-retention-days: 7 # min age for untagged versions
+          keep-latest: 10 # newest eligible tagged versions to keep
+          delete-untagged: false # allow deleting old untagged versions
+          always-keep-newest: true # never delete the newest version
+
+          # ── OCI safety (both default true; keep them on) ─────────────────
+          protect-multi-arch: true # keep platform children of kept indexes
+          protect-referrers: true # keep signatures/attestations/SBOMs
+
+          # ── Safety rails ─────────────────────────────────────────────────
+          dry-run: ${{ inputs.dry-run }} # default true: plan only
+          # Required when dry-run is false; must equal owner/package exactly:
+          confirm-delete: ""
+          verify-inventory-before-apply: true # abort if inventory changed
+          validate-after-cleanup: true # fail if a protected version vanished
+          max-deletions: 20 # absolute deletion budget
+          max-delete-percentage: 25 # percentage deletion budget
+          fail-on-empty: false # fail when the package has no versions
+
+          # ── Execution ────────────────────────────────────────────────────
+          concurrency: 2 # concurrent requests, 1–10
+          retry-count: 3 # retries for transient API failures, 0–5

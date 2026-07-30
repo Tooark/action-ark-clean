@@ -47,7 +47,7 @@ jobs:
       matrix:
         package: [aws-cli, gcloud-cli, tofu]
     steps:
-      - uses: Tooark/action-ark-clean@v1
+      - uses: Tooark/action-ark-clean@v0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: ${{ github.repository_owner }}
@@ -62,7 +62,14 @@ jobs:
 
 O repositório executor precisa de acesso administrativo ao pacote. Um PAT clássico usado para exclusão precisa de escopos
 de leitura/exclusão de packages. Prefira `GITHUB_TOKEN` com acesso explícito de Actions ao pacote ou um GitHub App/token
-dedicado. Um exemplo completo de produção está em [examples/tooark-cleanup.yml](examples/tooark-cleanup.yml).
+dedicado.
+
+Mais exemplos em [examples/](examples/):
+
+- [minimal-dry-run.yml](examples/minimal-dry-run.yml) — o menor setup útil: relatório semanal, nada é excluído
+- [full-options.yml](examples/full-options.yml) — todos os inputs suportados com seus defaults e uma nota breve
+- [apply-with-audit.yml](examples/apply-with-audit.yml) — modo apply com plano/relatório enviados como artifacts de auditoria
+- [tooark-cleanup.yml](examples/tooark-cleanup.yml) — caso real de produção: matriz sobre vários pacotes
 
 ## ⚙️ Inputs
 
@@ -170,8 +177,8 @@ As versões mantidas dos documentos originais de planejamento ficam em [docs/](d
 
 As actions do CI são pinadas por SHA completo de commit. CodeQL, dependency review e Dependabot rodam a cada mudança. As
 releases são construídas a partir do fonte, verificadas quanto à reprodutibilidade do bundle e publicadas com checksums
-SHA-256, SBOM CycloneDX e atestado de proveniência de build; a tag móvel `v1` só é atualizada pelo workflow de release
-protegido. Consumidores com postura estrita devem pinar um SHA completo.
+SHA-256, SBOM CycloneDX e atestado de proveniência de build; a tag móvel de major (atualmente `v0`) só é atualizada pelo
+workflow de release protegido. Consumidores com postura estrita devem pinar um SHA completo.
 
 Os controles de nível de repositório (branch protection, environment `release` protegido, secret scanning) estão pendentes
 até o repositório se tornar público — veja [docs/REPO-SETUP.md](docs/REPO-SETUP.md) para o status e os comandos exatos.

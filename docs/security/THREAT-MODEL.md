@@ -50,7 +50,7 @@ A package can change between plan and apply. Controls: inventory fingerprint, sh
 
 - Attacker submits a PR changing regex defaults to match every version.
 - A compromised dependency exfiltrates the token.
-- A maintainer moves `v1` to unreviewed code.
+- A maintainer moves the moving major tag to unreviewed code.
 - A package has more than one page but only the first page is evaluated.
 - A version has `latest` and `sha-*`; naive logic deletes it.
 - A manifest child appears untagged and old but is still referenced.

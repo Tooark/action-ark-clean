@@ -26,7 +26,7 @@ plan or a public repository):
       no force pushes, no deletions, linear history, conversation resolution.
 - [ ] **Protected `release` environment** — required reviewer approval before
       the release workflow runs; without it, anyone with tag push access could
-      trigger a release and move the `v1` tag.
+      trigger a release and move the moving major tag.
       The [release workflow](../.github/workflows/release.yml) already declares
       `environment: release`.
 - [ ] **Secret scanning + push protection** — requires GHAS on private repos;

@@ -194,7 +194,7 @@ pushing an immutable SemVer tag (`vX.Y.Z`):
 1. CI re-runs lint, typecheck, tests, and the bundle-reproducibility check.
 2. Checksums (`SHA256SUMS.txt`), a CycloneDX SBOM, and build provenance
    attestation are generated and attached to the GitHub release.
-3. The moving major tag (`v1`) is updated **only** by this protected workflow.
+3. The moving major tag (e.g. `v0`, `v1`) is updated **only** by this protected workflow.
 
 Do **not** hand-move tags. Update [CHANGELOG.md](CHANGELOG.md) as part of the
 release PR.

@@ -34,7 +34,7 @@ cleanup) plus the complete documentation and governance set.
   scheme); unproven relations fail closed as `PROTECTED_UNKNOWN_RELATION`.
 - Supply chain: SHA-pinned CI, CodeQL, dependency review, Dependabot, bundle
   reproducibility check, and a release workflow with checksums, CycloneDX SBOM,
-  build provenance attestation, and protected moving `v1` tag.
+  build provenance attestation, and protected moving major tag.
 - Complete documentation set: `CONTRIBUTING.md`, `SECURITY.md`,
   `CODE_OF_CONDUCT.md`, `SUPPORT.md`, `NOTICE`, issue/PR templates, and live
   copies of the planning docs (architecture, ADRs, action contract, threat
@@ -43,6 +43,8 @@ cleanup) plus the complete documentation and governance set.
   tables, and community sections; branding assets under `media/`.
 - `.github/FUNDING.yml` (Sponsor button) and a structured `.github/CODEOWNERS`
   with per-area rules.
+- Usage examples under `examples/`: minimal dry-run, all options with defaults,
+  apply mode with audit artifacts, and a production matrix.
 
 [Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Tooark/action-ark-clean/releases/tag/v0.1.0

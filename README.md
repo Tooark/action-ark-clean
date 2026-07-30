@@ -50,7 +50,7 @@ jobs:
       matrix:
         package: [aws-cli, gcloud-cli, tofu]
     steps:
-      - uses: Tooark/action-ark-clean@v1
+      - uses: Tooark/action-ark-clean@v0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: ${{ github.repository_owner }}
@@ -64,8 +64,14 @@ jobs:
 ```
 
 The executing repository needs package administration access. A classic PAT used for deletion needs package read/delete
-scopes. Prefer `GITHUB_TOKEN` with explicit package Actions access or a dedicated GitHub App/token. A complete
-production example lives in [examples/tooark-cleanup.yml](examples/tooark-cleanup.yml).
+scopes. Prefer `GITHUB_TOKEN` with explicit package Actions access or a dedicated GitHub App/token.
+
+More examples under [examples/](examples/):
+
+- [minimal-dry-run.yml](examples/minimal-dry-run.yml) — smallest useful setup: a weekly report, nothing deleted
+- [full-options.yml](examples/full-options.yml) — every supported input with its default and a short note
+- [apply-with-audit.yml](examples/apply-with-audit.yml) — apply mode with plan/report uploaded as audit artifacts
+- [tooark-cleanup.yml](examples/tooark-cleanup.yml) — real production case: matrix over many packages
 
 ## ⚙️ Inputs
 
@@ -178,7 +184,7 @@ The maintained versions of the original planning documents live under [docs/](do
 
 CI actions are pinned by full commit SHA. CodeQL, dependency review, and Dependabot run on every change. Releases are built
 from source, checked for bundle reproducibility, published with SHA-256 checksums, a CycloneDX SBOM, and build provenance
-attestation; the moving `v1` tag is only updated by the protected release workflow. Consumers with a strict posture should
+attestation; the moving major tag (currently `v0`) is only updated by the protected release workflow. Consumers with a strict posture should
 pin a full commit SHA.
 
 Repository-level controls (branch protection, protected `release` environment, secret scanning) are pending until the

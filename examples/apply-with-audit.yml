@@ -1,0 +1,40 @@
+# Apply mode with durable audit records: deletes within tight budgets and
+# uploads the JSON plan and apply report as workflow artifacts.
+# Deletion only happens on manual dispatch with dry-run unchecked AND the
+# exact confirm-delete value — scheduled runs always stay dry-run.
+name: Cleanup GHCR (apply with audit)
+on:
+  schedule: [{ cron: "0 3 * * 1" }]
+  workflow_dispatch:
+    inputs:
+      dry-run: { description: Plan only, type: boolean, default: true }
+permissions:
+  contents: read
+  packages: write
+concurrency: { group: ghcr-cleanup, cancel-in-progress: false }
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - id: arklean
+        uses: Tooark/action-ark-clean@v0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          package: my-image
+          dry-run: ${{ github.event_name != 'workflow_dispatch' || inputs.dry-run }}
+          confirm-delete: ${{ github.repository_owner }}/my-image
+          keep-latest: 10
+          max-deletions: 10
+          max-delete-percentage: 20
+
+      # The plan is always written; the apply report only in apply mode.
+      # Strict consumers should pin third-party actions by full commit SHA.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arklean-audit-${{ github.run_id }}
+          path: |
+            ${{ steps.arklean.outputs.plan-path }}
+            ${{ steps.arklean.outputs.result-path }}
+          if-no-files-found: ignore

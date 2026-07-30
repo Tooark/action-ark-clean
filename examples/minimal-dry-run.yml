@@ -1,0 +1,19 @@
+# Smallest useful setup: a weekly dry-run report of what Arklean WOULD delete.
+# Nothing is ever deleted (dry-run defaults to true). Start here, read the plan
+# in the Step Summary, then graduate to apply-with-audit.yml.
+name: GHCR Retention Report
+on:
+  schedule: [{ cron: "0 6 * * 1" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read # dry-run only needs read access
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Tooark/action-ark-clean@v0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          package: my-image

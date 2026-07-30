@@ -48,7 +48,10 @@ inputs:
     description: Number of newest otherwise eligible tagged versions to retain
     default: "10"
   delete-untagged:
-    description: Permit deletion of old untagged versions; disabled by default until OCI inspection is available
+    description: >-
+      Permit deletion of old untagged versions. Disabled by default as a
+      conservative posture; OCI inspection (protect-multi-arch and
+      protect-referrers) guards multi-arch children and referrers when enabled.
     default: "false"
   always-keep-newest:
     description: Always preserve the newest package version
