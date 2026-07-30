@@ -94,6 +94,8 @@ test("apply without matching confirm-delete aborts before deleting", async () =>
     assert.equal(r.status, 1);
     assert.match(r.stderr, /confirm-delete/);
     assert.deepEqual(mock.calls.delete, []);
+    // The plan is still published even though apply was refused.
+    assert.ok(r.outputs["plan-path"], "plan-path output must be set on confirm-delete abort");
   } finally {
     await mock.close();
   }
@@ -138,6 +140,9 @@ test("apply aborts when inventory changes between plan and apply", async () => {
     assert.equal(r.status, 1);
     assert.match(r.stderr, /ABORTED_INVENTORY_CHANGED/);
     assert.deepEqual(mock.calls.delete, []);
+    // The plan outputs from the original evaluation must survive the abort.
+    assert.ok(r.outputs["plan-path"], "plan-path output must be set on inventory abort");
+    assert.equal(JSON.parse(readFileSync(r.outputs["plan-path"], "utf8")).planSha256, r.outputs["plan-sha256"]);
   } finally {
     await mock.close();
   }
@@ -190,6 +195,25 @@ test("safety budget aborts with ABORTED_BUDGET_EXCEEDED", async () => {
     const r = await runAction(mock.url, { "INPUT_KEEP-LATEST": "0", "INPUT_MAX-DELETIONS": "0" });
     assert.equal(r.status, 1);
     assert.match(r.stderr, /ABORTED_BUDGET_EXCEEDED/);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("budget abort still publishes the plan outputs and the plan file", async () => {
+  const mock = await startMockRegistry({ pages: defaultPages() });
+  try {
+    const r = await runAction(mock.url, { "INPUT_KEEP-LATEST": "0", "INPUT_MAX-DELETIONS": "0" });
+    assert.equal(r.status, 1);
+    assert.equal(r.outputs.scanned, "3");
+    assert.equal(r.outputs.eligible, "1");
+    assert.ok(r.outputs["plan-path"], "plan-path output must be set on budget abort");
+    const plan = JSON.parse(readFileSync(r.outputs["plan-path"], "utf8"));
+    assert.equal(plan.planSha256, r.outputs["plan-sha256"]);
+    assert.equal(plan.counts.eligible, 1);
+    // Apply never started: apply outputs must not exist on abort.
+    assert.equal(r.outputs.deleted, undefined);
+    assert.equal(r.outputs["result-path"], undefined);
   } finally {
     await mock.close();
   }

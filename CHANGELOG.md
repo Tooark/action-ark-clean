@@ -12,6 +12,19 @@ and this project adheres to
 
 Nothing yet.
 
+## [0.1.1] - 2026-07-30
+
+### Fixed
+
+- The plan outputs (`scanned`, `protected`, `eligible`, `plan-sha256`,
+  `plan-path`) are now emitted as soon as the plan file is written, so
+  run-level aborts after planning (`ABORTED_BUDGET_EXCEEDED`, a
+  `confirm-delete` mismatch, `ABORTED_INVENTORY_CHANGED`) still expose the
+  plan for audit. Previously all outputs were only emitted at the end of a
+  successful run, leaving the aborted case — the one most worth auditing —
+  without a discoverable plan. The apply outputs (`deleted`, `absent`,
+  `failed`, `result-path`) continue to be emitted only when the run completes.
+
 ## [0.1.0] - 2026-07-29
 
 First release: core implementation (roadmap V0.1–V0.4, except orphan referrer
@@ -46,5 +59,6 @@ cleanup) plus the complete documentation and governance set.
 - Usage examples under `examples/`: minimal dry-run, all options with defaults,
   apply mode with audit artifacts, and a production matrix.
 
-[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Tooark/action-ark-clean/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Tooark/action-ark-clean/releases/tag/v0.1.0

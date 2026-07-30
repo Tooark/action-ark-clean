@@ -13,7 +13,9 @@ The package type is fixed to `container` in V1 (FR-001) and is not exposed as an
 
 ## Permissions
 
-- Workflow token: `contents: read` and `packages: write`; deletion additionally requires that the target package grants the executing repository administrative Actions access, or a token (classic PAT or GitHub App) with package read/delete permission.
+- Workflow token: `contents: read` and `packages: write`; deletion additionally requires that the target package grants
+  the executing repository administrative Actions access, or a token (classic PAT or GitHub App) with package
+  read/delete permission.
 - Dry-run requires only package read access.
 - Follow least privilege (R-005): prefer `GITHUB_TOKEN` with explicit package Actions access or a dedicated GitHub App over broad personal tokens.
 
@@ -32,7 +34,9 @@ Identity:
 Retention:
 
 - `protected-tags`: newline-separated exact values or `/regex/` expressions; defaults protect `latest`, `stable`, `production`, and SemVer tags.
-- `ephemeral-tags`: newline-separated exact values or `/regex/` expressions; defaults match commit SHAs, feature/fix/hotfix/chore/pr prefixes, and scan tags. Mutable branch tags (`main`, `master`, `develop`) are intentionally not ephemeral by default.
+- `ephemeral-tags`: newline-separated exact values or `/regex/` expressions; defaults match commit SHAs,
+  feature/fix/hotfix/chore/pr prefixes, and scan tags. Mutable branch tags (`main`, `master`, `develop`) are
+  intentionally not ephemeral by default.
 - `ephemeral-retention-days`: default `30`.
 - `untagged-retention-days`: default `7`.
 - `keep-latest`: default `10`.
@@ -44,7 +48,10 @@ OCI safety:
 - `protect-multi-arch`: default `true`; protects platform children of retained multi-arch indexes by inspecting registry manifests.
 - `protect-referrers`: default `true`; protects referrers of retained versions via the OCI 1.1 `subject` field and the cosign `sha256-<digest>.<suffix>` tag scheme.
 
-When either flag is enabled and the plan has eligible versions, Arklean exchanges the token for a registry pull token and fetches one manifest per scanned version (bounded by `concurrency`, with retries). Versions whose manifest cannot be inspected fail closed as `PROTECTED_UNKNOWN_RELATION`; if a retained version's manifest is unknown, every eligible untagged version is also protected, because any of them could be its child.
+When either flag is enabled and the plan has eligible versions, Arklean exchanges the token for a registry pull token
+and fetches one manifest per scanned version (bounded by `concurrency`, with retries). Versions whose manifest cannot
+be inspected fail closed as `PROTECTED_UNKNOWN_RELATION`; if a retained version's manifest is unknown, every eligible
+untagged version is also protected, because any of them could be its child.
 
 Safety:
 
@@ -75,11 +82,21 @@ Execution:
 
 ## Plan and report artifacts
 
-The JSON plan is always written, in both dry-run and apply modes, to a file under the runner temporary directory; `plan-path` reports its location and `plan-sha256` its canonical hash. In apply mode a JSON apply report is also written (`result-path`) recording, per attempted deletion, the outcome (`deleted`, `absent`, or `failed` with the error) plus aggregate counts and the post-apply validation status. No input controls artifact emission in V0.x. Uploading either file as a workflow artifact is a documented consumer step (Backlog F5).
+The JSON plan is always written, in both dry-run and apply modes, to a file under the runner temporary directory;
+`plan-path` reports its location and `plan-sha256` its canonical hash. Since 0.1.1, the plan outputs (`scanned`,
+`protected`, `eligible`, `plan-sha256`, `plan-path`) are emitted as soon as the plan is written, so run-level aborts
+that happen after planning (`ABORTED_BUDGET_EXCEEDED`, a `confirm-delete` mismatch, `ABORTED_INVENTORY_CHANGED`) still
+expose the plan for audit; the apply outputs (`deleted`, `absent`, `failed`, `result-path`) are only emitted when the
+run completes planning and apply. In apply mode a JSON apply report is also written (`result-path`) recording, per
+attempted deletion, the outcome (`deleted`, `absent`, or `failed` with the error) plus aggregate counts and the
+post-apply validation status. No input controls artifact emission in V0.x. Uploading either file as a workflow artifact
+is a documented consumer step (Backlog F5).
 
 ## Reason codes
 
-Stable machine-readable codes. Plan reason codes and apply outcomes are distinct namespaces: every version receives exactly one plan reason code (its final disposition, per the domain model), and versions whose deletion is attempted additionally receive one outcome in the apply report.
+Stable machine-readable codes. Plan reason codes and apply outcomes are distinct namespaces: every version receives
+exactly one plan reason code (its final disposition, per the domain model), and versions whose deletion is attempted
+additionally receive one outcome in the apply report.
 
 Plan reason codes (one per version):
 

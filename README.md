@@ -4,6 +4,7 @@
 
 # Arklean
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Arklean-2088FF?logo=githubactions&logoColor=white)](https://github.com/marketplace/actions/arklean)
 [![CI](https://github.com/Tooark/action-ark-clean/actions/workflows/ci.yml/badge.svg)](https://github.com/Tooark/action-ark-clean/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/Tooark/action-ark-clean)](https://github.com/Tooark/action-ark-clean/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)

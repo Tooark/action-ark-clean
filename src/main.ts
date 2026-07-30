@@ -45,8 +45,17 @@ export async function run(): Promise<void> {
   const dir = process.env.RUNNER_TEMP || process.cwd();
   const planPath = `${dir}/arklean-plan-${sanitize(c.packageName)}.json`;
 
-  // O plano é gravado antes do check de budget para que um abort ainda deixe o artefato de auditoria.
+  // O plano é gravado e seus outputs são emitidos antes do check de budget, para que
+  // um abort (budget, confirm-delete, inventário) ainda deixe o artefato de auditoria
+  // acessível via plan-path; os outputs de apply só existem quando o fluxo completa.
   await save(planPath, JSON.stringify({ ...plan, planSha256: hash }, null, 2));
+  await Promise.all([
+    output("scanned", plan.counts.scanned),
+    output("protected", plan.counts.protected),
+    output("eligible", plan.counts.eligible),
+    output("plan-sha256", hash),
+    output("plan-path", planPath),
+  ]);
   assertBudget(c, plan);
 
   const eligible = plan.decisions.filter((d) => d.disposition === "eligible");
@@ -131,14 +140,9 @@ export async function run(): Promise<void> {
   }
 
   await Promise.all([
-    output("scanned", plan.counts.scanned),
-    output("protected", plan.counts.protected),
-    output("eligible", plan.counts.eligible),
     output("deleted", deleted),
     output("absent", absent),
     output("failed", failed),
-    output("plan-sha256", hash),
-    output("plan-path", planPath),
     output("result-path", resultPath),
   ]);
 
