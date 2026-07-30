@@ -54,7 +54,6 @@ submit code.
 | `dist/`              | Committed compiled bundle executed by the runner               |
 | `tests/`             | Node test runner suites + HTTP mock of the GitHub API/registry |
 | `docs/`              | Architecture, ADRs, threat model, runbook, contract            |
-| `handoff/`           | Original planning package, kept as reference documentation     |
 
 A module reference in Portuguese lives at
 [docs/SOURCE-MODULES.pt-BR.md](docs/SOURCE-MODULES.pt-BR.md). The architecture

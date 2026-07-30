@@ -38,8 +38,7 @@ cleanup) plus the complete documentation and governance set.
 - Complete documentation set: `CONTRIBUTING.md`, `SECURITY.md`,
   `CODE_OF_CONDUCT.md`, `SUPPORT.md`, `NOTICE`, issue/PR templates, and live
   copies of the planning docs (architecture, ADRs, action contract, threat
-  model, supply chain, runbook, test strategy, governance) under `docs/`;
-  the original planning package is preserved in `handoff/`.
+  model, supply chain, runbook, test strategy, governance) under `docs/`.
 - Structured READMEs (EN and pt-BR) with feature overview, full input/output
   tables, and community sections; branding assets under `media/`.
 - `.github/FUNDING.yml` (Sponsor button) and a structured `.github/CODEOWNERS`

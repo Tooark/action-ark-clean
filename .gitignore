@@ -4,3 +4,6 @@ coverage/
 *.log
 .env
 .claude/settings.local.json
+
+# Local planning/reference package; will be migrated to a separate private repo
+handoff/

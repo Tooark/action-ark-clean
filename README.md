@@ -172,8 +172,7 @@ with an HTTP mock of the GitHub API — no network access needed.
 - [Source module reference (pt-BR)](docs/SOURCE-MODULES.pt-BR.md)
 - [Changelog](CHANGELOG.md)
 
-The [handoff/](handoff/) directory preserves the original planning package as reference documentation; the maintained
-versions of its documents live under [docs/](docs/).
+The maintained versions of the original planning documents live under [docs/](docs/).
 
 ## 🔐 Supply chain
 

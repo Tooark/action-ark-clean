@@ -164,7 +164,7 @@ O bundle `dist/` commitado deve sempre corresponder a um build novo; o CI falha 
 - [Referência dos módulos de código (pt-BR)](docs/SOURCE-MODULES.pt-BR.md)
 - [Changelog](CHANGELOG.md)
 
-O diretório [handoff/](handoff/) preserva o pacote original de planejamento como documentação de referência; as versões mantidas dos seus documentos ficam em [docs/](docs/).
+As versões mantidas dos documentos originais de planejamento ficam em [docs/](docs/).
 
 ## 🔐 Supply chain
 
