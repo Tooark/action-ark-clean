@@ -1,11 +1,9 @@
-# Repository setup — pending items
+# Repository setup
 
 Tracks the repository-level security controls required by
-[SUPPLY-CHAIN.md](security/SUPPLY-CHAIN.md). Some are applied;
-the rest are **blocked only because the repository is private on the free
-plan**. Arklean is Apache-2.0 and the GitHub Marketplace requires a public
-repository anyway, so the pending items below must be resolved **as soon as the
-repository is made public** (or the organization moves to a paid plan).
+[SUPPLY-CHAIN.md](security/SUPPLY-CHAIN.md). The repository became public on
+2026-07-30 and **all controls are applied**. The commands below are kept as a
+reference for reproducing this setup in other Tooark repositories.
 
 ## Applied (2026-07-28)
 
@@ -17,32 +15,31 @@ repository is made public** (or the organization moves to a paid plan).
 - [x] Dependabot version updates configured
       ([.github/dependabot.yml](../.github/dependabot.yml)).
 
-## Pending — blocked by private repo on the free plan
+## Applied (2026-07-30, after going public)
 
-Attempted on 2026-07-28 and rejected by the API (HTTP 403/422: requires a paid
-plan or a public repository):
-
-- [ ] **Branch protection on `main`** — required status check `test` (strict),
+- [x] Repository visibility set to public.
+- [x] **Branch protection on `main`** — required status check `test` (strict),
       no force pushes, no deletions, linear history, conversation resolution.
-- [ ] **Protected `release` environment** — required reviewer approval before
+- [x] **Protected `release` environment** — required reviewer approval before
       the release workflow runs; without it, anyone with tag push access could
       trigger a release and move the moving major tag.
-      The [release workflow](../.github/workflows/release.yml) already declares
-      `environment: release`.
-- [ ] **Secret scanning + push protection** — requires GHAS on private repos;
-      free on public repos.
-- [ ] **Verify CodeQL uploads** — CodeQL result upload may fail on private
-      repos without GHAS; confirm the workflow is green after going public.
+- [x] **Secret scanning + push protection** enabled.
+- [x] **Private vulnerability reporting** enabled — the "Report a
+      vulnerability" flow promised by [SECURITY.md](../SECURITY.md).
+- [x] **CodeQL verified green** — going public auto-enabled code scanning
+      *default setup*, which rejects SARIF from the repo's own pinned advanced
+      workflow; default setup was disabled so the advanced workflow is
+      authoritative, and the re-run succeeded.
 
-## How to resolve
+## Reference — commands used
 
-1. Make the repository public when ready:
+1. Make the repository public:
 
    ```bash
    gh repo edit Tooark/action-ark-clean --visibility public --accept-visibility-change-consequences
    ```
 
-2. Apply branch protection:
+2. Branch protection on `main`:
 
    ```bash
    cat > /tmp/protection.json <<'JSON'
@@ -65,14 +62,14 @@ plan or a public repository):
    second maintainer joins, enable it with CODEOWNERS review:
    `{"require_code_owner_reviews": true, "required_approving_review_count": 1}`.
 
-3. Create the protected `release` environment (reviewer ID via `gh api user --jq .id`):
+3. Protected `release` environment (reviewer ID via `gh api user --jq .id`):
 
    ```bash
    printf '{"reviewers":[{"type":"User","id":%s}]}' "$(gh api user --jq .id)" > /tmp/env.json
    gh api -X PUT repos/Tooark/action-ark-clean/environments/release --input /tmp/env.json
    ```
 
-4. Enable secret scanning and push protection:
+4. Secret scanning and push protection:
 
    ```bash
    gh api -X PATCH repos/Tooark/action-ark-clean --input - <<'JSON'
@@ -85,6 +82,32 @@ plan or a public repository):
    JSON
    ```
 
-5. Re-run the CodeQL workflow and confirm it is green.
+5. Private vulnerability reporting:
 
-6. Update this file, checking the boxes above.
+   ```bash
+   gh api -X PUT repos/Tooark/action-ark-clean/private-vulnerability-reporting
+   ```
+
+6. Disable code scanning default setup (auto-enabled on going public; conflicts
+   with the pinned advanced CodeQL workflow):
+
+   ```bash
+   gh api -X PATCH repos/Tooark/action-ark-clean/code-scanning/default-setup -f state=not-configured
+   ```
+
+## Where to verify in the GitHub UI
+
+- Branch protection: Settings → Branches → rule for `main`.
+- Release environment: Settings → Environments → `release`; during a release
+  run, the Actions run shows a "Review deployments" approval gate.
+- Secret scanning and push protection: Settings → Advanced Security; alerts
+  under Security → Secret scanning alerts.
+- Private vulnerability reporting: Security → Advisories → "Report a
+  vulnerability".
+- CodeQL: Actions → CodeQL workflow (green), alerts under Security → Code
+  scanning alerts.
+
+## Future
+
+- When a second maintainer joins, require CODEOWNERS-reviewed pull requests
+  (see note in step 2).
