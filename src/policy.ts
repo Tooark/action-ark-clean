@@ -299,6 +299,48 @@ export function planHash(plan: Plan): string {
 }
 
 /**
+ * Em `budget-mode: cap`, adia candidatas excedentes em vez de abortar: mantém
+ * como elegíveis as mais antigas que cabem nos dois orçamentos e reclassifica o
+ * restante como `DEFERRED_BUDGET` — retidas nesta execução, candidatas nas
+ * próximas. As mais antigas saem primeiro para que o backlog dreneie em ordem
+ * de idade.
+ * @param config Configuração com limites de exclusão.
+ * @param plan Plano de limpeza a ser ajustado.
+ * @returns Plano com excedentes adiados; satisfaz `assertBudget` por construção.
+ */
+export function capToBudget(config: Config, plan: Plan): Plan {
+  const allowed = Math.max(
+    0,
+    Math.min(config.maxDeletions, Math.floor((config.maxDeletePercentage / 100) * plan.counts.scanned)),
+  );
+  if (plan.counts.eligible <= allowed) {
+    return plan;
+  }
+
+  const oldestFirst = plan.decisions
+    .filter((d) => d.disposition === "eligible")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.versionId - b.versionId);
+  const kept = new Set(oldestFirst.slice(0, allowed).map((d) => d.versionId));
+
+  // matchedRule é preservado nas adiadas: continua sendo a evidência de por que são candidatas.
+  const decisions = plan.decisions.map((d) =>
+    d.disposition === "eligible" && !kept.has(d.versionId)
+      ? { ...d, disposition: "protected" as const, reason: "DEFERRED_BUDGET" as const }
+      : { ...d },
+  );
+
+  return {
+    ...plan,
+    decisions,
+    counts: {
+      scanned: decisions.length,
+      protected: decisions.filter((x) => x.disposition === "protected").length,
+      eligible: decisions.filter((x) => x.disposition === "eligible").length,
+    },
+  };
+}
+
+/**
  * Aborta com `ABORTED_BUDGET_EXCEEDED` quando o plano excede o limite absoluto
  * (`max-deletions`) ou percentual (`max-delete-percentage`) de exclusões.
  * @param config Configuração com limites de exclusão.

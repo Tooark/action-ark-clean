@@ -1,9 +1,44 @@
 {
   "name": "arklean",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Safe and explainable GHCR retention policies",
   "type": "module",
+  "author": {
+    "name": "Paulo Sergio de Freitas Junior",
+    "email": "paulo.freitas@tooark.com",
+    "url": "https://paulofreitas.tooark.com"
+  },
+  "bugs": {
+    "url": "https://github.com/Tooark/action-ark-clean/issues"
+  },
+  "homepage": "https://github.com/Tooark/action-ark-clean/blob/main/README.md",
+  "keywords": [
+    "tooark",
+    "ark",
+    "cleaner",
+    "container",
+    "ghcr",
+    "github-actions"
+  ],
+  "repository": {
+    "url": "https://github.com/Tooark/action-ark-clean.git",
+    "type": "git"
+  },
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/paulosfjunior"
+    },
+    {
+      "type": "ko-fi",
+      "url": "https://ko-fi.com/paulosfjunior"
+    },
+    {
+      "type": "paypal",
+      "url": "https://www.paypal.com/donate/?business=62KETU4PXBWZC&no_recurring=0&currency_code=BRL"
+    }
+  ],
   "engines": {
     "node": ">=24"
   },

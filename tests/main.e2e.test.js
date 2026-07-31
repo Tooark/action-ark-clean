@@ -7,6 +7,7 @@ import test from "node:test";
 import { apiVersion, startMockRegistry } from "./helpers/mock-registry.mjs";
 
 const OLD = "2026-01-01T00:00:00Z";
+const LESS_OLD = "2026-03-01T00:00:00Z";
 const RECENT = "2026-07-27T00:00:00Z";
 
 // Async spawn: the mock registry runs in this process, so the parent event
@@ -195,6 +196,55 @@ test("safety budget aborts with ABORTED_BUDGET_EXCEEDED", async () => {
     const r = await runAction(mock.url, { "INPUT_KEEP-LATEST": "0", "INPUT_MAX-DELETIONS": "0" });
     assert.equal(r.status, 1);
     assert.match(r.stderr, /ABORTED_BUDGET_EXCEEDED/);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("budget-mode cap defers the excess instead of aborting", async () => {
+  const mock = await startMockRegistry({
+    pages: [[apiVersion(1, ["latest"], OLD), apiVersion(2, ["sha-abc"], OLD), apiVersion(3, ["sha-def"], LESS_OLD)]],
+  });
+  try {
+    const r = await runAction(mock.url, {
+      "INPUT_KEEP-LATEST": "0",
+      "INPUT_ALWAYS-KEEP-NEWEST": "false",
+      "INPUT_MAX-DELETIONS": "1",
+      "INPUT_BUDGET-MODE": "cap",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.eligible, "1");
+    assert.match(r.stdout, /deferred to future runs/);
+    const plan = JSON.parse(readFileSync(r.outputs["plan-path"], "utf8"));
+    // Oldest candidate stays eligible; the newer one is deferred, not aborted.
+    assert.equal(plan.decisions.find((d) => d.versionId === 2).disposition, "eligible");
+    const deferred = plan.decisions.find((d) => d.versionId === 3);
+    assert.equal(deferred.disposition, "protected");
+    assert.equal(deferred.reason, "DEFERRED_BUDGET");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("budget-mode cap applies only within the budget and validation passes", async () => {
+  const mock = await startMockRegistry({
+    pages: [[apiVersion(1, ["latest"], OLD), apiVersion(2, ["sha-abc"], OLD), apiVersion(3, ["sha-def"], LESS_OLD)]],
+  });
+  try {
+    const r = await runAction(mock.url, {
+      "INPUT_DRY-RUN": "false",
+      "INPUT_CONFIRM-DELETE": "Tooark/demo",
+      "INPUT_KEEP-LATEST": "0",
+      "INPUT_ALWAYS-KEEP-NEWEST": "false",
+      "INPUT_MAX-DELETIONS": "1",
+      "INPUT_BUDGET-MODE": "cap",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.deleted, "1");
+    assert.deepEqual(mock.calls.delete, [2]);
+    const report = JSON.parse(readFileSync(r.outputs["result-path"], "utf8"));
+    // The deferred version counts as protected, so post-apply validation covers it.
+    assert.equal(report.validation, "passed");
   } finally {
     await mock.close();
   }

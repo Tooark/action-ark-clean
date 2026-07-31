@@ -12,6 +12,18 @@ and this project adheres to
 
 Nothing yet.
 
+## [0.1.2] - 2026-07-31
+
+### Added
+
+- `budget-mode` input (default `abort`, preserving current behavior). With
+  `cap`, when the plan exceeds `max-deletions` or `max-delete-percentage`, the
+  oldest candidates that fit both budgets stay eligible and the rest are
+  deferred with the new `DEFERRED_BUDGET` reason code — retained this run,
+  candidates again on future runs — so large backlogs drain across scheduled
+  runs instead of aborting them. The Step Summary reports the deferred count in
+  cap mode.
+
 ## [0.1.1] - 2026-07-30
 
 ### Fixed
@@ -59,6 +71,7 @@ cleanup) plus the complete documentation and governance set.
 - Usage examples under `examples/`: minimal dry-run, all options with defaults,
   apply mode with audit artifacts, and a production matrix.
 
-[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Tooark/action-ark-clean/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Tooark/action-ark-clean/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Tooark/action-ark-clean/releases/tag/v0.1.0

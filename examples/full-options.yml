@@ -57,6 +57,9 @@ jobs:
           validate-after-cleanup: true # fail if a protected version vanished
           max-deletions: 20 # absolute deletion budget
           max-delete-percentage: 25 # percentage deletion budget
+          # abort: exceeded budget fails the whole run (nothing is deleted);
+          # cap: delete the oldest candidates that fit the budgets, defer the rest
+          budget-mode: abort
           fail-on-empty: false # fail when the package has no versions
 
           # ── Execution ────────────────────────────────────────────────────

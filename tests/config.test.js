@@ -62,8 +62,14 @@ test("loadConfig applies documented defaults", () => {
   assert.equal(c.keepLatest, 10);
   assert.equal(c.maxDeletions, 20);
   assert.equal(c.maxDeletePercentage, 25);
+  assert.equal(c.budgetMode, "abort");
   assert.equal(c.concurrency, 2);
   assert.equal(c.retryCount, 3);
+});
+
+test("loadConfig validates budget-mode", () => {
+  assert.equal(withEnv({ "INPUT_BUDGET-MODE": "cap" }, loadConfig).budgetMode, "cap");
+  assert.throws(() => withEnv({ "INPUT_BUDGET-MODE": "slice" }, loadConfig), /budget-mode must be abort or cap/);
 });
 
 test("loadConfig requires token, owner, and package", () => {

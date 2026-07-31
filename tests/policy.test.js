@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertBudget, buildPlan } from "../dist/policy.js";
+import { assertBudget, buildPlan, capToBudget } from "../dist/policy.js";
 
 const rule = (v) =>
   v.startsWith("/") ? { kind: "regex", value: v, regex: new RegExp(v.slice(1, -1)) } : { kind: "exact", value: v };
@@ -57,6 +57,45 @@ test("budget fails closed with ABORTED_BUDGET_EXCEEDED", () => {
   const p = buildPlan({ ...config, keepLatest: 0, alwaysKeepNewest: false }, [v(1, [], 8)], NOW);
   assert.throws(() => assertBudget({ ...config, maxDeletions: 0 }, p), /ABORTED_BUDGET_EXCEEDED/);
   assert.throws(() => assertBudget({ ...config, maxDeletePercentage: 0 }, p), /ABORTED_BUDGET_EXCEEDED/);
+});
+
+test("capToBudget defers the newest candidates and keeps the oldest eligible", () => {
+  const base = { ...config, keepLatest: 0, alwaysKeepNewest: false };
+  const p = buildPlan(base, [v(1, ["sha-a"], 90), v(2, ["sha-b"], 60), v(3, ["sha-c"], 45)], NOW);
+  assert.equal(p.counts.eligible, 3);
+
+  const capped = capToBudget({ ...base, maxDeletions: 2 }, p);
+  assert.equal(capped.counts.eligible, 2);
+  assert.equal(capped.counts.protected, 1);
+  // Oldest (1, 2) stay eligible; the newest candidate (3) is deferred.
+  assert.equal(capped.decisions.find((d) => d.versionId === 1).disposition, "eligible");
+  assert.equal(capped.decisions.find((d) => d.versionId === 2).disposition, "eligible");
+  const deferred = capped.decisions.find((d) => d.versionId === 3);
+  assert.equal(deferred.disposition, "protected");
+  assert.equal(deferred.reason, "DEFERRED_BUDGET");
+  // The evidence of why it was a candidate is preserved.
+  assert.equal(deferred.matchedRule, "/^sha-/");
+  // The capped plan satisfies the budget gate by construction.
+  assert.doesNotThrow(() => assertBudget({ ...base, maxDeletions: 2 }, capped));
+});
+
+test("capToBudget honors the percentage budget", () => {
+  const base = { ...config, keepLatest: 0, alwaysKeepNewest: false };
+  const p = buildPlan(base, [v(1, ["sha-a"], 90), v(2, ["sha-b"], 60), v(3, ["latest"], 10)], NOW);
+  assert.equal(p.counts.eligible, 2);
+
+  // 40% of 3 scanned -> floor(1.2) = 1 allowed deletion.
+  const capped = capToBudget({ ...base, maxDeletePercentage: 40 }, p);
+  assert.equal(capped.counts.eligible, 1);
+  assert.equal(capped.decisions.find((d) => d.versionId === 1).disposition, "eligible");
+  assert.equal(capped.decisions.find((d) => d.versionId === 2).reason, "DEFERRED_BUDGET");
+  assert.doesNotThrow(() => assertBudget({ ...base, maxDeletePercentage: 40 }, capped));
+});
+
+test("capToBudget is a no-op when the plan fits the budgets", () => {
+  const base = { ...config, keepLatest: 0, alwaysKeepNewest: false };
+  const p = buildPlan(base, [v(1, ["sha-a"], 90)], NOW);
+  assert.deepEqual(capToBudget(base, p), p);
 });
 
 test("always-keep-newest uses PROTECTED_NEWEST reason", () => {

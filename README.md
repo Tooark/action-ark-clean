@@ -113,6 +113,7 @@ Safety and execution:
 | `validate-after-cleanup`        | `true`  | Re-read inventory after apply; fail if a protected version is gone |
 | `max-deletions`                 | `20`    | Absolute deletion safety budget                                    |
 | `max-delete-percentage`         | `25`    | Percentage deletion safety budget                                  |
+| `budget-mode`                   | `abort` | `abort` fails on exceeded budgets; `cap` defers the excess         |
 | `fail-on-empty`                 | `false` | Fail when the package has no versions                              |
 | `owner-type`                    | `auto`  | `auto`, `organization`, or `user`                                  |
 | `concurrency`                   | `2`     | Concurrent requests, 1–10                                          |

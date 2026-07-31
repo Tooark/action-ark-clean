@@ -7,7 +7,9 @@
 - API errors contain status and version ID, not response bodies that may expose information.
 - Pagination refuses inventories beyond 1000 pages instead of using partial data.
 - Duplicate version IDs abort the run instead of producing an ambiguous inventory.
-- Deletion is bounded by absolute and percentage budgets (`ABORTED_BUDGET_EXCEEDED`).
+- Deletion is bounded by absolute and percentage budgets: with `budget-mode: abort` (default) an exceeded budget fails
+  the run (`ABORTED_BUDGET_EXCEEDED`); with `cap`, excess candidates are deferred (`DEFERRED_BUDGET`) and the budgets
+  still bound what a single run can delete.
 - Apply requires exact `confirm-delete: owner/package`.
 - Inventory is re-read before deletion; changes abort the run (`ABORTED_INVENTORY_CHANGED`).
 - After apply, the inventory is re-read again and the run fails if any protected version disappeared (`VALIDATION_FAILED`), even when deletions succeeded.
@@ -17,7 +19,9 @@
 - Untagged deletion defaults to false.
 - Mutable branch tags are not ephemeral by default.
 - The newest package version is retained by default.
-- With `protect-multi-arch`/`protect-referrers` (default true), registry manifests are inspected: children of retained indexes and referrers of retained versions are protected, and any relation that cannot be proven fails closed as `PROTECTED_UNKNOWN_RELATION` — including full registry unavailability, which protects every eligible untagged version.
+- With `protect-multi-arch`/`protect-referrers` (default true), registry manifests are inspected: children of retained
+  indexes and referrers of retained versions are protected, and any relation that cannot be proven fails closed as
+  `PROTECTED_UNKNOWN_RELATION` — including full registry unavailability, which protects every eligible untagged version.
 - The registry pull token obtained for manifest inspection is scoped to `pull` on the single package.
 - Orphan referrer cleanup (`delete-orphaned-referrers`) is not implemented; the input name is reserved until fixtures prove safety.
 - CI actions are pinned by full commit SHA; releases ship checksums, SBOM, and build provenance.

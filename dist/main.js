@@ -3,7 +3,7 @@ import { loadConfig } from "./config.js";
 import { deleteVersion, listVersions, resolveOwnerType } from "./github.js";
 import { fail, info, output, save, summary, warning } from "./io.js";
 import { gatherOciEvidence } from "./oci.js";
-import { assertBudget, buildPlan, planHash, protectOciRelations } from "./policy.js";
+import { assertBudget, buildPlan, capToBudget, planHash, protectOciRelations } from "./policy.js";
 /**
  * Sanitiza um fragmento de nome de pacote para uso seguro em nomes de arquivo.
  * @param name Fragmento de nome a ser sanitizado.
@@ -34,6 +34,17 @@ export async function run() {
             warning(`OCI inspection incomplete for ${evidence.unknown.size} version(s); unknown relations fail closed`);
         }
         plan = protectOciRelations(plan, evidence, c);
+    }
+    // O cap acontece antes do hash/gravação para que o plano publicado já reflita
+    // as decisões finais, incluindo as candidatas adiadas (DEFERRED_BUDGET).
+    let deferred = 0;
+    if (c.budgetMode === "cap") {
+        const before = plan.counts.eligible;
+        plan = capToBudget(c, plan);
+        deferred = before - plan.counts.eligible;
+        if (deferred > 0) {
+            warning(`Budget cap: ${deferred} candidate(s) deferred to future runs`);
+        }
     }
     const hash = planHash(plan);
     const dir = process.env.RUNNER_TEMP || process.cwd();
@@ -135,6 +146,7 @@ export async function run() {
         `- Scanned: ${plan.counts.scanned}\n` +
         `- Protected: ${plan.counts.protected}\n` +
         `- Eligible: ${plan.counts.eligible}\n` +
+        (c.budgetMode === "cap" ? `- Deferred by budget: ${deferred}\n` : "") +
         `- Deleted: ${deleted}\n` +
         `- Already absent: ${absent}\n` +
         `- Failed: ${failed}\n` +

@@ -43,10 +43,12 @@ export type ResolvedConfig = Config & {
  * - `PROTECTED_OCI_CHILD`: filho de plataforma de um índice multi-arch retido.
  * - `PROTECTED_OCI_REFERRER`: referrer (assinatura/atestado/SBOM) de uma versão retida.
  * - `PROTECTED_UNKNOWN_RELATION`: relação OCI não comprovável; falha fechado.
+ * - `DEFERRED_BUDGET`: candidata excedente aos orçamentos com `budget-mode: cap`; retida nesta execução,
+ *   volta a ser candidata nas próximas (não é garantia de retenção).
  * - `ELIGIBLE_EPHEMERAL`: tag efêmera mais antiga que `ephemeral-retention-days`.
  * - `ELIGIBLE_UNTAGGED`: sem tags e mais antiga que `untagged-retention-days`, com `delete-untagged` habilitado.
  */
-export type Reason = "PROTECTED_TAG" | "PROTECTED_NEWEST" | "PROTECTED_KEEP_LATEST" | "PROTECTED_TOO_RECENT" | "PROTECTED_UNMATCHED_TAG" | "PROTECTED_OCI_CHILD" | "PROTECTED_OCI_REFERRER" | "PROTECTED_UNKNOWN_RELATION" | "ELIGIBLE_EPHEMERAL" | "ELIGIBLE_UNTAGGED";
+export type Reason = "PROTECTED_TAG" | "PROTECTED_NEWEST" | "PROTECTED_KEEP_LATEST" | "PROTECTED_TOO_RECENT" | "PROTECTED_UNMATCHED_TAG" | "PROTECTED_OCI_CHILD" | "PROTECTED_OCI_REFERRER" | "PROTECTED_UNKNOWN_RELATION" | "DEFERRED_BUDGET" | "ELIGIBLE_EPHEMERAL" | "ELIGIBLE_UNTAGGED";
 /**
  * Desfecho de uma tentativa de exclusão no modo apply:
  * `deleted` (HTTP 204), `absent` (HTTP 404, sucesso idempotente) ou `failed` (qualquer outro status).
@@ -102,6 +104,12 @@ export interface Config {
     maxDeletions: number;
     /** Limite percentual de exclusões sobre o total escaneado (`ABORTED_BUDGET_EXCEEDED`). */
     maxDeletePercentage: number;
+    /**
+     * Comportamento quando o plano excede um orçamento: `abort` (padrão) falha a execução;
+     * `cap` mantém como elegíveis as candidatas mais antigas que cabem nos dois orçamentos
+     * e adia o restante (`DEFERRED_BUDGET`) para execuções futuras.
+     */
+    budgetMode: "abort" | "cap";
     /** Número de requisições DELETE concorrentes (1 a 10). */
     concurrency: number;
     /** Tentativas extras para falhas transitórias da API (0 a 5). */

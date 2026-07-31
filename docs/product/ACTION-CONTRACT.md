@@ -61,6 +61,9 @@ Safety:
 - `validate-after-cleanup`: default `true`; re-reads the inventory after apply and fails the run if any protected version disappeared.
 - `max-deletions`: default `20`.
 - `max-delete-percentage`: default `25`.
+- `budget-mode`: default `abort` (since 0.1.2). `abort` fails the run when the plan exceeds a budget
+  (`ABORTED_BUDGET_EXCEEDED`); `cap` keeps the oldest candidates that fit both budgets eligible and defers the rest as
+  `DEFERRED_BUDGET`, so a large backlog drains across runs instead of blocking them.
 - `fail-on-empty`: default `false`; fails when the package has no versions (renamed from `fail-on-no-match`).
 
 Execution:
@@ -108,6 +111,8 @@ Plan reason codes (one per version):
 - `PROTECTED_OCI_CHILD`: platform child of a retained index; `matchedRule` carries the parent digest.
 - `PROTECTED_OCI_REFERRER`: signature/attestation/SBOM referrer of a retained version; `matchedRule` carries the subject digest.
 - `PROTECTED_UNKNOWN_RELATION`: the relation could not be proven; fails closed per ADR-003 and ADR-005.
+- `DEFERRED_BUDGET` (since 0.1.2): candidate exceeding the budgets under `budget-mode: cap`; retained this run and a
+  candidate again on future runs. Not a retention guarantee.
 - `ELIGIBLE_EPHEMERAL`
 - `ELIGIBLE_UNTAGGED`
 
@@ -115,7 +120,8 @@ Apply outcomes (one per attempted deletion, recorded in the apply report without
 
 Run abort codes (run-level, reported in the failure message and Step Summary):
 
-- `ABORTED_BUDGET_EXCEEDED`: a safety budget (`max-deletions` or `max-delete-percentage`) was exceeded by the plan; aborts before any DELETE.
+- `ABORTED_BUDGET_EXCEEDED`: a safety budget (`max-deletions` or `max-delete-percentage`) was exceeded by the plan;
+  aborts before any DELETE. Only occurs with `budget-mode: abort` (the default); `cap` defers the excess instead.
 - `ABORTED_NO_MATCH`: `fail-on-empty` is enabled and the package has no versions.
 - `ABORTED_INVENTORY_CHANGED`: the inventory changed between plan and apply; aborts before any DELETE.
 - `VALIDATION_FAILED`: post-apply validation found a protected version missing; the run fails even though deletions succeeded.

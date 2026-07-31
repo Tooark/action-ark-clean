@@ -28,6 +28,17 @@ export declare function protectOciRelations(plan: Plan, evidence: OciEvidence, c
  */
 export declare function planHash(plan: Plan): string;
 /**
+ * Em `budget-mode: cap`, adia candidatas excedentes em vez de abortar: mantém
+ * como elegíveis as mais antigas que cabem nos dois orçamentos e reclassifica o
+ * restante como `DEFERRED_BUDGET` — retidas nesta execução, candidatas nas
+ * próximas. As mais antigas saem primeiro para que o backlog dreneie em ordem
+ * de idade.
+ * @param config Configuração com limites de exclusão.
+ * @param plan Plano de limpeza a ser ajustado.
+ * @returns Plano com excedentes adiados; satisfaz `assertBudget` por construção.
+ */
+export declare function capToBudget(config: Config, plan: Plan): Plan;
+/**
  * Aborta com `ABORTED_BUDGET_EXCEEDED` quando o plano excede o limite absoluto
  * (`max-deletions`) ou percentual (`max-delete-percentage`) de exclusões.
  * @param config Configuração com limites de exclusão.

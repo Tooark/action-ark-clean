@@ -111,6 +111,7 @@ Segurança e execução:
 | `validate-after-cleanup`        | `true`  | Relê o inventário após o apply; falha se uma versão protegida sumiu |
 | `max-deletions`                 | `20`    | Orçamento absoluto de exclusões                                     |
 | `max-delete-percentage`         | `25`    | Orçamento percentual de exclusões                                   |
+| `budget-mode`                   | `abort` | `abort` falha ao exceder orçamentos; `cap` adia o excedente         |
 | `fail-on-empty`                 | `false` | Falha quando o pacote não tem versões                               |
 | `owner-type`                    | `auto`  | `auto`, `organization` ou `user`                                    |
 | `concurrency`                   | `2`     | Requisições concorrentes, 1–10                                      |

@@ -106,6 +106,7 @@ tipado, antes de qualquer acesso à rede.
 - `validate-after-cleanup`: default `true`.
 - `max-deletions`: default `20`, faixa `0..10000`.
 - `max-delete-percentage`: default `25`, faixa `0..100`.
+- `budget-mode`: default `abort` (ou `cap`).
 - `concurrency`: default `2`, faixa `1..10`.
 - `retry-count`: default `3`, faixa `0..5`.
 
@@ -295,6 +296,7 @@ em um plano auditável, sem qualquer acesso à rede (invariante verificada por
 
 - `buildPlan(config, versions, now?): Plan`
 - `protectOciRelations(plan, evidence, config): Plan`
+- `capToBudget(config, plan): Plan`
 - `planHash(plan): string`
 - `assertBudget(config, plan): void`
 
@@ -337,6 +339,15 @@ os próprios filhos):
   ADR-005).
 - Se algum índice retido está em `unknown`, toda candidata sem tag também vira
   `PROTECTED_UNKNOWN_RELATION` — qualquer uma pode ser filha dele.
+
+### `capToBudget` — orçamento como fatia (`budget-mode: cap`)
+
+Quando as candidatas excedem os orçamentos, mantém elegíveis as **mais antigas**
+que cabem em `max-deletions` e `max-delete-percentage` (o menor dos dois manda)
+e reclassifica o restante como `DEFERRED_BUDGET` (disposição `protected` nesta
+execução; volta a ser candidata nas próximas). `matchedRule` é preservado como
+evidência. O plano resultante satisfaz `assertBudget` por construção. No modo
+`abort` (default), esta função não é chamada.
 
 ### `planHash`
 

@@ -3,7 +3,7 @@ description: Safe, explainable lifecycle policies for GitHub Container Registry
 author: Tooark
 branding:
   icon: trash-2
-  color: purple
+  color: blue
 inputs:
   token:
     description: GitHub token with package administration permission
@@ -83,6 +83,12 @@ inputs:
   max-delete-percentage:
     description: Percentage deletion safety budget
     default: "25"
+  budget-mode:
+    description: >-
+      abort (default) fails the run when the plan exceeds a deletion budget;
+      cap keeps the oldest candidates that fit both budgets eligible and defers
+      the rest to future runs (DEFERRED_BUDGET).
+    default: abort
   concurrency:
     description: Concurrent DELETE requests from 1 to 10
     default: "2"

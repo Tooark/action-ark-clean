@@ -80,6 +80,10 @@ export function loadConfig() {
     if (ownerType !== "auto" && ownerType !== "organization" && ownerType !== "user") {
         throw new Error("owner-type must be auto, organization, or user");
     }
+    const budgetMode = input("budget-mode") || "abort";
+    if (budgetMode !== "abort" && budgetMode !== "cap") {
+        throw new Error("budget-mode must be abort or cap");
+    }
     return {
         token,
         owner: input("owner", true),
@@ -101,6 +105,7 @@ export function loadConfig() {
         validateAfterCleanup: bool("validate-after-cleanup", input("validate-after-cleanup") || "true"),
         maxDeletions: integer("max-deletions", input("max-deletions") || "20", 0, 10000),
         maxDeletePercentage: integer("max-delete-percentage", input("max-delete-percentage") || "25", 0, 100),
+        budgetMode,
         concurrency: integer("concurrency", input("concurrency") || "2", 1, 10),
         retryCount: integer("retry-count", input("retry-count") || "3", 0, 5),
     };
