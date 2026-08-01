@@ -62,6 +62,12 @@ inputs:
   protect-referrers:
     description: Protect signatures, attestations, and SBOM referrers of retained versions
     default: "true"
+  delete-orphaned-referrers:
+    description: >-
+      Permit deletion of signature/attestation/SBOM referrers whose subject is
+      confirmed absent — missing from the inventory AND the registry returns
+      404 for its manifest. Fail-closed; disabled by default.
+    default: "false"
   dry-run:
     description: Plan only; no DELETE requests
     default: "true"
@@ -102,6 +108,10 @@ outputs:
   deleted: { description: Number deleted }
   absent: { description: Number already absent when deletion was attempted }
   failed: { description: Number whose deletion failed }
+  estimated-reclaimed-bytes:
+    description: >-
+      Best-effort estimate of bytes reclaimed by the plan's eligible versions,
+      from registry manifest sizes; empty when registry inspection did not run
   plan-sha256: { description: SHA-256 of the canonical cleanup plan }
   plan-path: { description: Path to the JSON plan }
   result-path: { description: Path to the JSON apply report; empty in dry-run }

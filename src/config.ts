@@ -112,6 +112,7 @@ export function loadConfig(): Config {
     alwaysKeepNewest: bool("always-keep-newest", input("always-keep-newest") || "true"),
     protectMultiArch: bool("protect-multi-arch", input("protect-multi-arch") || "true"),
     protectReferrers: bool("protect-referrers", input("protect-referrers") || "true"),
+    deleteOrphanedReferrers: bool("delete-orphaned-referrers", input("delete-orphaned-referrers") || "false"),
     dryRun: bool("dry-run", input("dry-run") || "true"),
     confirmDelete: input("confirm-delete"),
     failOnEmpty: bool("fail-on-empty", input("fail-on-empty") || "false"),

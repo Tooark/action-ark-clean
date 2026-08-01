@@ -15,8 +15,7 @@ strict TypeScript, with no runtime npm dependencies.
 > **Safety notice:** with `protect-multi-arch` and `protect-referrers` (both on by default), Arklean inspects registry
 > manifests and protects platform children of retained multi-arch indexes and their signature/attestation/SBOM referrers;
 > relations it cannot prove fail closed (`PROTECTED_UNKNOWN_RELATION`). Still start with `dry-run: true` and review the
-> plan before enabling deletion — orphan referrer cleanup is not implemented yet, and `delete-untagged` stays `false` by
-> default.
+> plan before enabling deletion — `delete-untagged` and `delete-orphaned-referrers` stay `false` by default.
 
 🌍 **Languages:** ![USA Flag](https://flagcdn.com/w20/us.png) **English (this file)** · [![Brazil Flag](https://flagcdn.com/w20/br.png) Português](README.pt-BR.md)
 
@@ -98,10 +97,11 @@ Retention policy:
 
 OCI safety:
 
-| Input                | Default | Description                                                             |
-| -------------------- | ------- | ----------------------------------------------------------------------- |
-| `protect-multi-arch` | `true`  | Protect platform children of retained multi-arch indexes                |
-| `protect-referrers`  | `true`  | Protect signature, attestation, and SBOM referrers of retained versions |
+| Input                       | Default | Description                                                                                         |
+| --------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `protect-multi-arch`        | `true`  | Protect platform children of retained multi-arch indexes                                            |
+| `protect-referrers`         | `true`  | Protect signature, attestation, and SBOM referrers of retained versions                             |
+| `delete-orphaned-referrers` | `false` | Delete referrers whose subject is confirmed absent (missing from inventory and 404 in the registry) |
 
 Safety and execution:
 
@@ -124,17 +124,18 @@ The normative description of every input, output, and reason code is the
 
 ## 📤 Outputs
 
-| Output        | Description                                                      |
-| ------------- | ---------------------------------------------------------------- |
-| `scanned`     | Number of versions scanned                                       |
-| `protected`   | Number of versions retained                                      |
-| `eligible`    | Number eligible for deletion                                     |
-| `deleted`     | Number deleted                                                   |
-| `absent`      | Number already gone when deletion was attempted (idempotent 404) |
-| `failed`      | Number whose deletion failed                                     |
-| `plan-sha256` | SHA-256 of the canonical cleanup plan                            |
-| `plan-path`   | Path of the JSON plan (always written)                           |
-| `result-path` | Path of the JSON apply report; empty string in dry-run           |
+| Output                      | Description                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| `scanned`                   | Number of versions scanned                                                                        |
+| `protected`                 | Number of versions retained                                                                       |
+| `eligible`                  | Number eligible for deletion                                                                      |
+| `deleted`                   | Number deleted                                                                                    |
+| `absent`                    | Number already gone when deletion was attempted (idempotent 404)                                  |
+| `failed`                    | Number whose deletion failed                                                                      |
+| `estimated-reclaimed-bytes` | Best-effort bytes the eligible versions would reclaim; empty when registry inspection did not run |
+| `plan-sha256`               | SHA-256 of the canonical cleanup plan                                                             |
+| `plan-path`                 | Path of the JSON plan (always written)                                                            |
+| `result-path`               | Path of the JSON apply report; empty string in dry-run                                            |
 
 Upload the plan and report as workflow artifacts if you need durable audit records.
 

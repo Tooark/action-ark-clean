@@ -100,6 +100,7 @@ tipado, antes de qualquer acesso à rede.
 - `always-keep-newest`: default `true`.
 - `protect-multi-arch`: default `true`.
 - `protect-referrers`: default `true`.
+- `delete-orphaned-referrers`: default `false`.
 - `dry-run`: default `true`.
 - `fail-on-empty`: default `false`.
 - `verify-inventory-before-apply`: default `true`.
@@ -284,6 +285,21 @@ durante a limpeza.
   escopo `pull` restrito ao único pacote inspecionado.
 - Falha se o HTTP não for ok ou se o token estiver ausente no payload.
 
+### `confirmAbsent(c, digests)`
+
+- Confirma ausência de subjects no registry para a limpeza de órfãos: **apenas
+  um 404 explícito** no manifest conta como prova.
+- Qualquer outra resposta ou falha (rede, autenticação, 5xx) deixa o digest de
+  fora do resultado — na dúvida, o referrer permanece retido.
+- Se a própria troca de token falhar, nada é confirmado.
+
+### Tamanhos (`evidence.sizes`)
+
+- Durante a inspeção, soma `config.size` + `layers[].size` (manifests de
+  imagem) ou os descritores de `manifests[]` (índices) por digest.
+- Base do output `estimated-reclaimed-bytes`, somado sobre as elegíveis do
+  plano final; vazio quando a inspeção não rodou.
+
 ## src/policy.ts
 
 ### Objetivo
@@ -296,6 +312,8 @@ em um plano auditável, sem qualquer acesso à rede (invariante verificada por
 
 - `buildPlan(config, versions, now?): Plan`
 - `protectOciRelations(plan, evidence, config): Plan`
+- `unresolvedSubjects(plan, evidence): Set<string>`
+- `releaseOrphanReferrers(plan, evidence, confirmedAbsent, config): Plan`
 - `capToBudget(config, plan): Plan`
 - `planHash(plan): string`
 - `assertBudget(config, plan): void`
@@ -339,6 +357,17 @@ os próprios filhos):
   ADR-005).
 - Se algum índice retido está em `unknown`, toda candidata sem tag também vira
   `PROTECTED_UNKNOWN_RELATION` — qualquer uma pode ser filha dele.
+
+### `unresolvedSubjects` e `releaseOrphanReferrers` — órfãos (`delete-orphaned-referrers`)
+
+`unresolvedSubjects` coleta os subjects (campo `subject` do manifest e tags
+Cosign) referenciados por retenções fracas (`PROTECTED_UNMATCHED_TAG`,
+`PROTECTED_TOO_RECENT`) que **não existem no inventário** — os únicos digests
+que precisam de confirmação no registry. `releaseOrphanReferrers` torna
+elegível (`ELIGIBLE_ORPHAN_REFERRER`) o referrer cujos subjects estão **todos**
+fora do inventário **e todos** confirmados 404 (`confirmAbsent` em `oci.ts`).
+Tags protegidas, keep-latest/newest, proteções OCI e relações desconhecidas
+nunca são liberadas; qualquer dúvida retém (fail-closed).
 
 ### `capToBudget` — orçamento como fatia (`budget-mode: cap`)
 

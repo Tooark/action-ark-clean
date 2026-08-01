@@ -57,6 +57,7 @@ test("loadConfig applies documented defaults", () => {
   assert.equal(c.validateAfterCleanup, true);
   assert.equal(c.protectMultiArch, true);
   assert.equal(c.protectReferrers, true);
+  assert.equal(c.deleteOrphanedReferrers, false);
   assert.equal(c.ephemeralDays, 30);
   assert.equal(c.untaggedDays, 7);
   assert.equal(c.keepLatest, 10);
@@ -65,6 +66,11 @@ test("loadConfig applies documented defaults", () => {
   assert.equal(c.budgetMode, "abort");
   assert.equal(c.concurrency, 2);
   assert.equal(c.retryCount, 3);
+});
+
+test("loadConfig parses delete-orphaned-referrers strictly", () => {
+  assert.equal(withEnv({ "INPUT_DELETE-ORPHANED-REFERRERS": "true" }, loadConfig).deleteOrphanedReferrers, true);
+  assert.throws(() => withEnv({ "INPUT_DELETE-ORPHANED-REFERRERS": "yes" }, loadConfig), /must be true or false/);
 });
 
 test("loadConfig validates budget-mode", () => {

@@ -2,8 +2,8 @@ import { pool } from "./concurrency.js";
 import { loadConfig } from "./config.js";
 import { deleteVersion, listVersions, resolveOwnerType } from "./github.js";
 import { fail, info, output, save, summary, warning } from "./io.js";
-import { gatherOciEvidence } from "./oci.js";
-import { assertBudget, buildPlan, capToBudget, planHash, protectOciRelations } from "./policy.js";
+import { confirmAbsent, gatherOciEvidence } from "./oci.js";
+import { assertBudget, buildPlan, capToBudget, planHash, protectOciRelations, releaseOrphanReferrers, unresolvedSubjects, } from "./policy.js";
 /**
  * Sanitiza um fragmento de nome de pacote para uso seguro em nomes de arquivo.
  * @param name Fragmento de nome a ser sanitizado.
@@ -28,12 +28,25 @@ export async function run() {
         throw new Error("ABORTED_NO_MATCH: package contains no versions");
     }
     let plan = buildPlan(c, versions);
-    if ((c.protectMultiArch || c.protectReferrers) && plan.counts.eligible > 0) {
-        const evidence = await gatherOciEvidence(c, versions);
+    // A limpeza de órfãos precisa da evidência mesmo sem candidatas iniciais:
+    // os referrers órfãos em geral estão protegidos por retenções fracas.
+    const needsOci = ((c.protectMultiArch || c.protectReferrers) && plan.counts.eligible > 0) || c.deleteOrphanedReferrers;
+    let evidence;
+    if (needsOci) {
+        evidence = await gatherOciEvidence(c, versions);
         if (evidence.unknown.size > 0) {
             warning(`OCI inspection incomplete for ${evidence.unknown.size} version(s); unknown relations fail closed`);
         }
         plan = protectOciRelations(plan, evidence, c);
+        if (c.deleteOrphanedReferrers) {
+            // Dupla prova de ausência: o subject não está no inventário (unresolvedSubjects)
+            // e o registry confirma 404 (confirmAbsent). Qualquer dúvida mantém o referrer.
+            const candidates = unresolvedSubjects(plan, evidence);
+            if (candidates.size > 0) {
+                const absent = await confirmAbsent(c, candidates);
+                plan = releaseOrphanReferrers(plan, evidence, absent, c);
+            }
+        }
     }
     // O cap acontece antes do hash/gravação para que o plano publicado já reflita
     // as decisões finais, incluindo as candidatas adiadas (DEFERRED_BUDGET).
@@ -46,6 +59,15 @@ export async function run() {
             warning(`Budget cap: ${deferred} candidate(s) deferred to future runs`);
         }
     }
+    // Estimativa best-effort do que esta execução excluiria (pós-cap); vazia quando
+    // a inspeção do registry não rodou e portanto não há tamanhos conhecidos.
+    let reclaimedBytes = "";
+    if (evidence) {
+        const oci = evidence;
+        reclaimedBytes = String(plan.decisions
+            .filter((d) => d.disposition === "eligible")
+            .reduce((sum, d) => sum + (oci.sizes.get(d.digest) ?? 0), 0));
+    }
     const hash = planHash(plan);
     const dir = process.env.RUNNER_TEMP || process.cwd();
     const planPath = `${dir}/arklean-plan-${sanitize(c.packageName)}.json`;
@@ -57,6 +79,7 @@ export async function run() {
         output("scanned", plan.counts.scanned),
         output("protected", plan.counts.protected),
         output("eligible", plan.counts.eligible),
+        output("estimated-reclaimed-bytes", reclaimedBytes),
         output("plan-sha256", hash),
         output("plan-path", planPath),
     ]);
@@ -147,12 +170,13 @@ export async function run() {
         `- Protected: ${plan.counts.protected}\n` +
         `- Eligible: ${plan.counts.eligible}\n` +
         (c.budgetMode === "cap" ? `- Deferred by budget: ${deferred}\n` : "") +
+        (reclaimedBytes !== "" ? `- Estimated reclaimed bytes: ${reclaimedBytes}\n` : "") +
         `- Deleted: ${deleted}\n` +
         `- Already absent: ${absent}\n` +
         `- Failed: ${failed}\n` +
         `- Post-apply validation: ${validation}\n` +
         `- Plan SHA-256: \`${hash}\`\n\n` +
-        `> OCI: multi-arch children and referrers of retained versions are protected via registry manifests when enabled; unknown relations fail closed. Orphan referrer cleanup is not yet implemented.\n`);
+        `> OCI: multi-arch children and referrers of retained versions are protected via registry manifests when enabled; unknown relations fail closed. Orphaned referrers are deleted only with delete-orphaned-referrers enabled and double-proven absence.\n`);
     if (failed > 0) {
         throw new Error(`${failed} deletion(s) failed`);
     }

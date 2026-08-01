@@ -12,6 +12,34 @@ and this project adheres to
 
 Nothing yet.
 
+## [0.2.0] - 2026-07-31
+
+This release completes the public contract: nothing remains reserved.
+
+### Added
+
+- `delete-orphaned-referrers` input (default `false`): deletes
+  signature/attestation/SBOM referrers only under double proof of absence —
+  every subject missing from the package inventory **and** confirmed 404 by the
+  registry. Released versions carry the new `ELIGIBLE_ORPHAN_REFERRER` reason
+  code with the absent subject as evidence. Only weak retentions can be
+  released; protected tags, keep-latest/newest, OCI protections, and unknown
+  relations are never overridden.
+- `estimated-reclaimed-bytes` output: best-effort bytes the plan's eligible
+  versions would reclaim, summed from registry manifest sizes; empty when
+  registry inspection did not run. Also shown in the Step Summary.
+- Coverage gate in `pnpm coverage` (lines ≥95%, branches ≥90%, functions ≥95%,
+  product code only), enforcing NFR-006 in CI.
+- Test suite expanded to 88 tests (~98% line coverage), including a
+  Tooark-shaped multi-arch release fixture mirroring real GHCR inventories.
+
+### Changed
+
+- `GITHUB_API_URL` and `ARKLEAN_REGISTRY_URL` are now read per call instead of
+  at module load (test hook; no behavior change in production).
+- The reserved input `ignore-missing-on-delete` will not be implemented: 404
+  during deletion is always idempotent success; the name is released.
+
 ## [0.1.2] - 2026-07-31
 
 ### Added
@@ -71,7 +99,8 @@ cleanup) plus the complete documentation and governance set.
 - Usage examples under `examples/`: minimal dry-run, all options with defaults,
   apply mode with audit artifacts, and a production matrix.
 
-[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Tooark/action-ark-clean/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Tooark/action-ark-clean/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/Tooark/action-ark-clean/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Tooark/action-ark-clean/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Tooark/action-ark-clean/releases/tag/v0.1.0

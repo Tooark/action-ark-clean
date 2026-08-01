@@ -8,6 +8,39 @@ const DAY = 86400000;
  */
 const COSIGN_TAG = /^sha256-([0-9a-f]{64})(\..+)?$/;
 const hash = (s) => createHash("sha256").update(s).digest("hex");
+/** Subjects apontados por tags de assinatura Cosign (`sha256-<digest>.<sufixo>`). */
+function cosignSubjects(tags) {
+    const out = [];
+    for (const tag of tags) {
+        const m = tag.match(COSIGN_TAG);
+        if (m) {
+            out.push(`sha256:${m[1]}`);
+        }
+    }
+    return out;
+}
+/** Todos os subjects conhecidos de uma decisão: campo `subject` do manifest e tags Cosign. */
+function subjectsOf(decision, evidence) {
+    const subjects = cosignSubjects(decision.tags);
+    const fromManifest = evidence.subjects.get(decision.digest);
+    if (fromManifest && !subjects.includes(fromManifest)) {
+        subjects.push(fromManifest);
+    }
+    return subjects;
+}
+/**
+ * Retenções "fracas" que a limpeza de órfãos pode sobrescrever. Tags protegidas,
+ * keep-latest/newest, proteções OCI e relações desconhecidas nunca são liberadas.
+ */
+const WEAK_RETENTIONS = ["PROTECTED_UNMATCHED_TAG", "PROTECTED_TOO_RECENT"];
+/** Contadores agregados recalculados a partir das decisões. */
+function countsOf(decisions) {
+    return {
+        scanned: decisions.length,
+        protected: decisions.filter((x) => x.disposition === "protected").length,
+        eligible: decisions.filter((x) => x.disposition === "eligible").length,
+    };
+}
 /**
  * Retorna o valor da primeira regra que casa com qualquer uma das tags,
  * ou `undefined` quando nenhuma regra corresponde.
@@ -215,11 +248,10 @@ export function protectOciRelations(plan, evidence, config) {
                     relatedTo = subject;
                 }
                 else {
-                    for (const tag of decision.tags) {
-                        const m = tag.match(COSIGN_TAG);
-                        if (m && retained.has(`sha256:${m[1]}`)) {
+                    for (const s of cosignSubjects(decision.tags)) {
+                        if (retained.has(s)) {
                             reason = "PROTECTED_OCI_REFERRER";
-                            relatedTo = `sha256:${m[1]}`;
+                            relatedTo = s;
                             break;
                         }
                     }
@@ -262,6 +294,59 @@ export function protectOciRelations(plan, evidence, config) {
  */
 export function planHash(plan) {
     return hash(JSON.stringify(plan));
+}
+/**
+ * Subjects referenciados por retenções fracas que não existem no inventário do
+ * pacote — os candidatos a confirmação de ausência no registry. Só esses digests
+ * precisam de verificação antes de `releaseOrphanReferrers`.
+ * @param plan Plano com as decisões correntes.
+ * @param evidence Evidência OCI com os subjects conhecidos.
+ * @returns Digests de subjects fora do inventário.
+ */
+export function unresolvedSubjects(plan, evidence) {
+    const inventory = new Set(plan.decisions.map((d) => d.digest));
+    const out = new Set();
+    for (const decision of plan.decisions) {
+        if (decision.disposition !== "protected" || !WEAK_RETENTIONS.includes(decision.reason)) {
+            continue;
+        }
+        for (const subject of subjectsOf(decision, evidence)) {
+            if (!inventory.has(subject)) {
+                out.add(subject);
+            }
+        }
+    }
+    return out;
+}
+/**
+ * Com `delete-orphaned-referrers`, torna elegíveis (`ELIGIBLE_ORPHAN_REFERRER`)
+ * referrers cujos subjects estão comprovadamente ausentes: todos fora do
+ * inventário E todos confirmados 404 no registry (dupla prova). Apenas retenções
+ * fracas são liberadas; qualquer dúvida mantém a versão retida (fail-closed).
+ * @param plan Plano com as decisões correntes.
+ * @param evidence Evidência OCI com os subjects conhecidos.
+ * @param confirmedAbsent Digests confirmados ausentes por `confirmAbsent`.
+ * @param config Configuração com a flag `delete-orphaned-referrers`.
+ * @returns Plano com os referrers órfãos liberados.
+ */
+export function releaseOrphanReferrers(plan, evidence, confirmedAbsent, config) {
+    if (!config.deleteOrphanedReferrers || confirmedAbsent.size === 0) {
+        return plan;
+    }
+    const inventory = new Set(plan.decisions.map((d) => d.digest));
+    const decisions = plan.decisions.map((d) => {
+        if (d.disposition !== "protected" || !WEAK_RETENTIONS.includes(d.reason)) {
+            return { ...d };
+        }
+        const subjects = subjectsOf(d, evidence);
+        const first = subjects[0];
+        if (first === undefined || !subjects.every((s) => !inventory.has(s) && confirmedAbsent.has(s))) {
+            return { ...d };
+        }
+        // matchedRule carrega o subject ausente como evidência da decisão.
+        return { ...d, disposition: "eligible", reason: "ELIGIBLE_ORPHAN_REFERRER", matchedRule: first };
+    });
+    return { ...plan, decisions, counts: countsOf(decisions) };
 }
 /**
  * Em `budget-mode: cap`, adia candidatas excedentes em vez de abortar: mantém

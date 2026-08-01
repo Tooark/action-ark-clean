@@ -47,8 +47,10 @@ export type ResolvedConfig = Config & {
  *   volta a ser candidata nas próximas (não é garantia de retenção).
  * - `ELIGIBLE_EPHEMERAL`: tag efêmera mais antiga que `ephemeral-retention-days`.
  * - `ELIGIBLE_UNTAGGED`: sem tags e mais antiga que `untagged-retention-days`, com `delete-untagged` habilitado.
+ * - `ELIGIBLE_ORPHAN_REFERRER`: referrer cujo subject está comprovadamente ausente (fora do inventário e
+ *   confirmado 404 no registry), com `delete-orphaned-referrers` habilitado.
  */
-export type Reason = "PROTECTED_TAG" | "PROTECTED_NEWEST" | "PROTECTED_KEEP_LATEST" | "PROTECTED_TOO_RECENT" | "PROTECTED_UNMATCHED_TAG" | "PROTECTED_OCI_CHILD" | "PROTECTED_OCI_REFERRER" | "PROTECTED_UNKNOWN_RELATION" | "DEFERRED_BUDGET" | "ELIGIBLE_EPHEMERAL" | "ELIGIBLE_UNTAGGED";
+export type Reason = "PROTECTED_TAG" | "PROTECTED_NEWEST" | "PROTECTED_KEEP_LATEST" | "PROTECTED_TOO_RECENT" | "PROTECTED_UNMATCHED_TAG" | "PROTECTED_OCI_CHILD" | "PROTECTED_OCI_REFERRER" | "PROTECTED_UNKNOWN_RELATION" | "DEFERRED_BUDGET" | "ELIGIBLE_EPHEMERAL" | "ELIGIBLE_UNTAGGED" | "ELIGIBLE_ORPHAN_REFERRER";
 /**
  * Desfecho de uma tentativa de exclusão no modo apply:
  * `deleted` (HTTP 204), `absent` (HTTP 404, sucesso idempotente) ou `failed` (qualquer outro status).
@@ -90,6 +92,11 @@ export interface Config {
     protectMultiArch: boolean;
     /** Protege referrers (assinaturas, atestados, SBOMs) de versões retidas. */
     protectReferrers: boolean;
+    /**
+     * Permite excluir referrers cujo subject está comprovadamente ausente: fora do
+     * inventário E confirmado 404 no registry. Fail-closed; desabilitado por padrão.
+     */
+    deleteOrphanedReferrers: boolean;
     /** Modo somente-plano: nenhuma requisição DELETE é enviada. Padrão `true`. */
     dryRun: boolean;
     /** Confirmação obrigatória no modo apply; deve ser exatamente `owner/package`. */
@@ -191,6 +198,11 @@ export interface OciEvidence {
     subjects: Map<string, string>;
     /** Digests cujo manifest não pôde ser inspecionado (falha de rede, autenticação ou HTTP não-2xx). */
     unknown: Set<string>;
+    /**
+     * Tamanho estimado por digest, em bytes, somado do config e das layers do manifest
+     * (ou dos descritores filhos, para índices). Base do output `estimated-reclaimed-bytes`.
+     */
+    sizes: Map<string, number>;
 }
 /**
  * Desfecho de uma tentativa de exclusão registrado no relatório de apply.

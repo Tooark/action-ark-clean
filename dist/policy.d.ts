@@ -28,6 +28,27 @@ export declare function protectOciRelations(plan: Plan, evidence: OciEvidence, c
  */
 export declare function planHash(plan: Plan): string;
 /**
+ * Subjects referenciados por retenções fracas que não existem no inventário do
+ * pacote — os candidatos a confirmação de ausência no registry. Só esses digests
+ * precisam de verificação antes de `releaseOrphanReferrers`.
+ * @param plan Plano com as decisões correntes.
+ * @param evidence Evidência OCI com os subjects conhecidos.
+ * @returns Digests de subjects fora do inventário.
+ */
+export declare function unresolvedSubjects(plan: Plan, evidence: OciEvidence): Set<string>;
+/**
+ * Com `delete-orphaned-referrers`, torna elegíveis (`ELIGIBLE_ORPHAN_REFERRER`)
+ * referrers cujos subjects estão comprovadamente ausentes: todos fora do
+ * inventário E todos confirmados 404 no registry (dupla prova). Apenas retenções
+ * fracas são liberadas; qualquer dúvida mantém a versão retida (fail-closed).
+ * @param plan Plano com as decisões correntes.
+ * @param evidence Evidência OCI com os subjects conhecidos.
+ * @param confirmedAbsent Digests confirmados ausentes por `confirmAbsent`.
+ * @param config Configuração com a flag `delete-orphaned-referrers`.
+ * @returns Plano com os referrers órfãos liberados.
+ */
+export declare function releaseOrphanReferrers(plan: Plan, evidence: OciEvidence, confirmedAbsent: Set<string>, config: Pick<Config, "deleteOrphanedReferrers">): Plan;
+/**
  * Em `budget-mode: cap`, adia candidatas excedentes em vez de abortar: mantém
  * como elegíveis as mais antigas que cabem nos dois orçamentos e reclassifica o
  * restante como `DEFERRED_BUDGET` — retidas nesta execução, candidatas nas

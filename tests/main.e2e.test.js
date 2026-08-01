@@ -324,6 +324,140 @@ test("registry failure fails closed instead of deleting untagged versions", asyn
   }
 });
 
+const HEX = "e".repeat(64);
+
+test("delete-orphaned-referrers releases confirmed orphans end to end", async () => {
+  const mock = await startMockRegistry({
+    pages: [[apiVersion(1, ["latest"], RECENT), apiVersion(2, [`sha256-${HEX}.sig`], OLD)]],
+    manifests: { [`sha256:${HEX}`]: 404 },
+  });
+  try {
+    const r = await runAction(mock.url, { "INPUT_DELETE-ORPHANED-REFERRERS": "true" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.eligible, "1");
+    const plan = JSON.parse(readFileSync(r.outputs["plan-path"], "utf8"));
+    const orphan = plan.decisions.find((d) => d.versionId === 2);
+    assert.equal(orphan.reason, "ELIGIBLE_ORPHAN_REFERRER");
+    assert.equal(orphan.matchedRule, `sha256:${HEX}`);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("orphan referrer stays retained when the subject still exists in the registry", async () => {
+  // No manifest override: every digest, including the subject, answers 200.
+  const mock = await startMockRegistry({
+    pages: [[apiVersion(1, ["latest"], RECENT), apiVersion(2, [`sha256-${HEX}.sig`], OLD)]],
+  });
+  try {
+    const r = await runAction(mock.url, { "INPUT_DELETE-ORPHANED-REFERRERS": "true" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.eligible, "0");
+    const plan = JSON.parse(readFileSync(r.outputs["plan-path"], "utf8"));
+    assert.equal(plan.decisions.find((d) => d.versionId === 2).reason, "PROTECTED_UNMATCHED_TAG");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("estimated-reclaimed-bytes sums the manifest sizes of eligible versions", async () => {
+  const mock = await startMockRegistry({
+    pages: defaultPages(),
+    manifests: { "sha256:2": { config: { size: 100 }, layers: [{ size: 1000 }, { size: 2000 }] } },
+  });
+  try {
+    const r = await runAction(mock.url, { "INPUT_KEEP-LATEST": "0" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.eligible, "1");
+    assert.equal(r.outputs["estimated-reclaimed-bytes"], "3100");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("estimated-reclaimed-bytes is empty when registry inspection does not run", async () => {
+  const mock = await startMockRegistry({ pages: defaultPages() });
+  try {
+    const r = await runAction(mock.url, {
+      "INPUT_KEEP-LATEST": "0",
+      "INPUT_PROTECT-MULTI-ARCH": "false",
+      "INPUT_PROTECT-REFERRERS": "false",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.eligible, "1");
+    assert.equal(r.outputs["estimated-reclaimed-bytes"], "");
+    assert.deepEqual(mock.calls.manifests, []);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("tooark-shaped release: index, platform children, and cosign referrers all survive", async () => {
+  // Mirrors the real base-images shape: 5 versions per release — one tagged
+  // multi-arch index, two untagged platform children, and two cosign referrers.
+  const mock = await startMockRegistry({
+    pages: [
+      [
+        {
+          id: 1,
+          name: `sha256:${HEX}`,
+          created_at: RECENT,
+          updated_at: RECENT,
+          metadata: { container: { tags: ["v1.2.3", "latest"] } },
+        },
+        apiVersion(2, [], OLD),
+        apiVersion(3, [], OLD),
+        apiVersion(4, [`sha256-${HEX}.sig`], OLD),
+        apiVersion(5, [`sha256-${HEX}.att`], OLD),
+      ],
+    ],
+    manifests: {
+      [`sha256:${HEX}`]: {
+        mediaType: "application/vnd.oci.image.index.v1+json",
+        manifests: [
+          { digest: "sha256:2", size: 500 },
+          { digest: "sha256:3", size: 500 },
+        ],
+      },
+    },
+  });
+  try {
+    const r = await runAction(mock.url, { "INPUT_DELETE-UNTAGGED": "true", "INPUT_KEEP-LATEST": "0" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.outputs.scanned, "5");
+    assert.equal(r.outputs.eligible, "0");
+    const plan = JSON.parse(readFileSync(r.outputs["plan-path"], "utf8"));
+    assert.equal(plan.decisions.find((d) => d.versionId === 2).reason, "PROTECTED_OCI_CHILD");
+    assert.equal(plan.decisions.find((d) => d.versionId === 3).reason, "PROTECTED_OCI_CHILD");
+    // Cosign referrers never become candidates: their tags match no ephemeral
+    // rule, so the unmatched-tag retention keeps them without needing OCI.
+    assert.equal(plan.decisions.find((d) => d.versionId === 4).reason, "PROTECTED_UNMATCHED_TAG");
+    assert.equal(plan.decisions.find((d) => d.versionId === 5).reason, "PROTECTED_UNMATCHED_TAG");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("failed deletions are reported per version and fail the run", async () => {
+  const mock = await startMockRegistry({ pages: defaultPages(), deleteStatus: () => 500 });
+  try {
+    const r = await runAction(mock.url, {
+      "INPUT_DRY-RUN": "false",
+      "INPUT_CONFIRM-DELETE": "Tooark/demo",
+      "INPUT_KEEP-LATEST": "0",
+      "INPUT_VALIDATE-AFTER-CLEANUP": "false",
+    });
+    assert.equal(r.status, 1);
+    assert.equal(r.outputs.failed, "1");
+    assert.match(r.stderr, /1 deletion\(s\) failed/);
+    const report = JSON.parse(readFileSync(r.outputs["result-path"], "utf8"));
+    assert.equal(report.results[0].outcome, "failed");
+    assert.match(report.results[0].error, /HTTP 500/);
+  } finally {
+    await mock.close();
+  }
+});
+
 test("fail-on-empty aborts with ABORTED_NO_MATCH", async () => {
   const mock = await startMockRegistry({ pages: [[]] });
   try {

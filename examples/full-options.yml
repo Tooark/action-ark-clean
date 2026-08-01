@@ -45,9 +45,12 @@ jobs:
           delete-untagged: false # allow deleting old untagged versions
           always-keep-newest: true # never delete the newest version
 
-          # ── OCI safety (both default true; keep them on) ─────────────────
+          # ── OCI safety (protections default true; keep them on) ─────────
           protect-multi-arch: true # keep platform children of kept indexes
           protect-referrers: true # keep signatures/attestations/SBOMs
+          # Delete referrers whose subject is confirmed absent (double proof:
+          # missing from the inventory AND 404 from the registry).
+          delete-orphaned-referrers: false
 
           # ── Safety rails ─────────────────────────────────────────────────
           dry-run: ${{ inputs.dry-run }} # default true: plan only

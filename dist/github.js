@@ -1,4 +1,5 @@
-const API = process.env.GITHUB_API_URL || "https://api.github.com";
+/** Base da API do GitHub; lida por chamada para permitir override em testes. */
+const api = () => process.env.GITHUB_API_URL || "https://api.github.com";
 /**
  * Monta o endpoint de versões do pacote para o escopo do proprietário resolvido.
  * @param c Configuração resolvida com `ownerType` definido.
@@ -7,7 +8,7 @@ const API = process.env.GITHUB_API_URL || "https://api.github.com";
 function base(c) {
     const encodedOwner = encodeURIComponent(c.owner);
     const owner = c.ownerType === "organization" ? `orgs/${encodedOwner}` : `users/${encodedOwner}`;
-    return `${API}/${owner}/packages/container/${encodeURIComponent(c.packageName)}/versions`;
+    return `${api()}/${owner}/packages/container/${encodeURIComponent(c.packageName)}/versions`;
 }
 /**
  * Cabeçalhos comuns exigidos pelas chamadas à API REST do GitHub.
@@ -69,7 +70,7 @@ export async function resolveOwnerType(c) {
     if (c.ownerType !== "auto") {
         return c.ownerType;
     }
-    const r = await request(c, `${API}/users/${encodeURIComponent(c.owner)}`);
+    const r = await request(c, `${api()}/users/${encodeURIComponent(c.owner)}`);
     if (!r.ok) {
         throw new Error(`GitHub API owner lookup failed with HTTP ${r.status}`);
     }

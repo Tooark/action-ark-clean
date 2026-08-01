@@ -3,8 +3,9 @@ import type { Config, OciEvidence, PackageVersion } from "./types.js";
 
 /**
  * ARKLEAN_REGISTRY_URL é um hook de teste; produção sempre fala com ghcr.io.
+ * Lida por chamada para permitir override em testes.
  */
-const REGISTRY = process.env.ARKLEAN_REGISTRY_URL || "https://ghcr.io";
+const registry = (): string => process.env.ARKLEAN_REGISTRY_URL || "https://ghcr.io";
 
 /**
  * Lista de tipos MIME aceitos para manifests OCI e Docker.
@@ -56,7 +57,7 @@ function repository(c: Config): string {
 async function registryToken(c: Config): Promise<string> {
   const basic = Buffer.from(`x:${c.token}`).toString("base64");
   const r = await fetchRetry(
-    `${REGISTRY}/token?service=ghcr.io&scope=repository:${repository(c)}:pull`,
+    `${registry()}/token?service=ghcr.io&scope=repository:${repository(c)}:pull`,
     { headers: { Authorization: `Basic ${basic}` } },
     c.retryCount,
   );
@@ -84,7 +85,7 @@ async function registryToken(c: Config): Promise<string> {
  * de token falha, caso em que todas as versões viram `unknown`.
  */
 export async function gatherOciEvidence(c: Config, versions: PackageVersion[]): Promise<OciEvidence> {
-  const evidence: OciEvidence = { children: new Map(), subjects: new Map(), unknown: new Set() };
+  const evidence: OciEvidence = { children: new Map(), subjects: new Map(), unknown: new Set(), sizes: new Map() };
 
   let token: string;
   try {
@@ -99,7 +100,7 @@ export async function gatherOciEvidence(c: Config, versions: PackageVersion[]): 
   await pool(versions, c.concurrency, async (v) => {
     try {
       const r = await fetchRetry(
-        `${REGISTRY}/v2/${repository(c)}/manifests/${encodeURIComponent(v.name)}`,
+        `${registry()}/v2/${repository(c)}/manifests/${encodeURIComponent(v.name)}`,
         { headers: { Authorization: `Bearer ${token}`, Accept: MANIFEST_ACCEPT } },
         c.retryCount,
       );
@@ -110,8 +111,10 @@ export async function gatherOciEvidence(c: Config, versions: PackageVersion[]): 
       }
 
       const manifest = (await r.json()) as {
-        manifests?: Array<{ digest?: string }>;
+        manifests?: Array<{ digest?: string; size?: number }>;
         subject?: { digest?: string };
+        config?: { size?: number };
+        layers?: Array<{ size?: number }>;
       };
 
       if (Array.isArray(manifest.manifests)) {
@@ -124,10 +127,61 @@ export async function gatherOciEvidence(c: Config, versions: PackageVersion[]): 
       if (manifest.subject?.digest) {
         evidence.subjects.set(v.name, manifest.subject.digest);
       }
+
+      // Estimativa de armazenamento: config + layers para manifests de imagem;
+      // descritores filhos para índices (o conteúdo real está nas versões filhas).
+      const size =
+        (manifest.config?.size ?? 0) +
+        (manifest.layers ?? []).reduce((sum, l) => sum + (l.size ?? 0), 0) +
+        (manifest.manifests ?? []).reduce((sum, m) => sum + (m.size ?? 0), 0);
+      if (size > 0) {
+        evidence.sizes.set(v.name, size);
+      }
     } catch {
       evidence.unknown.add(v.name);
     }
   });
 
   return evidence;
+}
+
+/**
+ * Confirma quais digests estão realmente ausentes do registry: apenas um HTTP
+ * 404 explícito no manifest conta como prova de ausência. Qualquer outra
+ * resposta ou falha (rede, autenticação, 5xx) deixa o digest de fora do
+ * resultado — na dúvida, o referrer correspondente permanece retido.
+ * @param c Configuração com token do GitHub, owner e packageName.
+ * @param digests Digests de subjects a verificar.
+ * @returns Conjunto dos digests comprovadamente ausentes (404).
+ */
+export async function confirmAbsent(c: Config, digests: Iterable<string>): Promise<Set<string>> {
+  const absent = new Set<string>();
+  const list = [...digests];
+  if (list.length === 0) {
+    return absent;
+  }
+
+  let token: string;
+  try {
+    token = await registryToken(c);
+  } catch {
+    return absent;
+  }
+
+  await pool(list, c.concurrency, async (digest) => {
+    try {
+      const r = await fetchRetry(
+        `${registry()}/v2/${repository(c)}/manifests/${encodeURIComponent(digest)}`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: MANIFEST_ACCEPT } },
+        c.retryCount,
+      );
+      if (r.status === 404) {
+        absent.add(digest);
+      }
+    } catch {
+      // Falha de rede não prova ausência; o digest fica de fora (fail-closed).
+    }
+  });
+
+  return absent;
 }

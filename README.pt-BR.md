@@ -14,8 +14,8 @@ GitHub Action segura e explicável para políticas de retenção no GitHub Conta
 > **Aviso de segurança:** com `protect-multi-arch` e `protect-referrers` (ambos ligados por padrão), o Arklean inspeciona
 > manifests do registry e protege filhos de plataforma de índices multi-arch retidos e seus referrers de
 > assinatura/atestado/SBOM; relações que não podem ser provadas falham fechado (`PROTECTED_UNKNOWN_RELATION`). Ainda assim
-> comece com `dry-run: true` e revise o plano antes de ativar exclusões — a limpeza de referrers órfãos ainda não foi
-> implementada, e `delete-untagged` permanece `false` por padrão.
+> comece com `dry-run: true` e revise o plano antes de ativar exclusões — `delete-untagged` e
+> `delete-orphaned-referrers` permanecem `false` por padrão.
 
 🌍 **Idiomas:** [![USA Flag](https://flagcdn.com/w20/us.png) English](README.md) · ![Brazil Flag](https://flagcdn.com/w20/br.png) **Português (este arquivo)**
 
@@ -96,10 +96,11 @@ Política de retenção:
 
 Segurança OCI:
 
-| Input                | Padrão | Descrição                                                           |
-| -------------------- | ------ | ------------------------------------------------------------------- |
-| `protect-multi-arch` | `true` | Protege filhos de plataforma de índices multi-arch retidos          |
-| `protect-referrers`  | `true` | Protege referrers de assinatura, atestado e SBOM de versões retidas |
+| Input                       | Padrão  | Descrição                                                                                         |
+| --------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `protect-multi-arch`        | `true`  | Protege filhos de plataforma de índices multi-arch retidos                                        |
+| `protect-referrers`         | `true`  | Protege referrers de assinatura, atestado e SBOM de versões retidas                               |
+| `delete-orphaned-referrers` | `false` | Exclui referrers cujo subject está comprovadamente ausente (fora do inventário e 404 no registry) |
 
 Segurança e execução:
 
@@ -121,17 +122,18 @@ A descrição normativa de cada input, output e reason code é o [contrato da ac
 
 ## 📤 Outputs
 
-| Output        | Descrição                                                         |
-| ------------- | ----------------------------------------------------------------- |
-| `scanned`     | Número de versões escaneadas                                      |
-| `protected`   | Número de versões retidas                                         |
-| `eligible`    | Número de versões elegíveis para exclusão                         |
-| `deleted`     | Número de versões excluídas                                       |
-| `absent`      | Número já ausente quando a exclusão foi tentada (404 idempotente) |
-| `failed`      | Número cuja exclusão falhou                                       |
-| `plan-sha256` | SHA-256 do plano canônico de limpeza                              |
-| `plan-path`   | Caminho do plano JSON (sempre gravado)                            |
-| `result-path` | Caminho do relatório JSON do apply; vazio em dry-run              |
+| Output                      | Descrição                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `scanned`                   | Número de versões escaneadas                                                                                  |
+| `protected`                 | Número de versões retidas                                                                                     |
+| `eligible`                  | Número de versões elegíveis para exclusão                                                                     |
+| `deleted`                   | Número de versões excluídas                                                                                   |
+| `absent`                    | Número já ausente quando a exclusão foi tentada (404 idempotente)                                             |
+| `failed`                    | Número cuja exclusão falhou                                                                                   |
+| `estimated-reclaimed-bytes` | Estimativa best-effort dos bytes que as elegíveis recuperariam; vazio quando a inspeção do registry não rodou |
+| `plan-sha256`               | SHA-256 do plano canônico de limpeza                                                                          |
+| `plan-path`                 | Caminho do plano JSON (sempre gravado)                                                                        |
+| `result-path`               | Caminho do relatório JSON do apply; vazio em dry-run                                                          |
 
 Envie o plano e o relatório como artifacts do workflow se precisar de registros de auditoria duráveis.
 

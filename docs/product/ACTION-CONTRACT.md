@@ -4,8 +4,8 @@ This is the implemented V0.x contract. It supersedes the original proposal: the
 safety inputs `confirm-delete`, `verify-inventory-before-apply`, and
 `delete-untagged` were added during implementation, and `fail-on-no-match` was
 renamed `fail-on-empty`. OCI graph protection (`protect-multi-arch`,
-`protect-referrers`) is implemented; orphan referrer cleanup remains reserved
-(see "Reserved").
+`protect-referrers`) and orphan referrer cleanup (`delete-orphaned-referrers`,
+since 0.2.0) are implemented.
 
 ## Scope
 
@@ -47,6 +47,11 @@ OCI safety:
 
 - `protect-multi-arch`: default `true`; protects platform children of retained multi-arch indexes by inspecting registry manifests.
 - `protect-referrers`: default `true`; protects referrers of retained versions via the OCI 1.1 `subject` field and the cosign `sha256-<digest>.<suffix>` tag scheme.
+- `delete-orphaned-referrers`: default `false` (since 0.2.0). Makes referrers eligible (`ELIGIBLE_ORPHAN_REFERRER`)
+  only under double proof of absence: every subject of the referrer is missing from the package inventory **and** the
+  registry answers 404 for its manifest. Only weak retentions (`PROTECTED_UNMATCHED_TAG`, `PROTECTED_TOO_RECENT`) can
+  be released; protected tags, keep-latest/newest, OCI protections, and unknown relations are never overridden. Any
+  doubt — network failure, authentication error, non-404 response — keeps the referrer retained.
 
 When either flag is enabled and the plan has eligible versions, Arklean exchanges the token for a registry pull token
 and fetches one manifest per scanned version (bounded by `concurrency`, with retries). Versions whose manifest cannot
@@ -82,6 +87,9 @@ Execution:
 - `plan-sha256`
 - `plan-path`
 - `result-path`: path of the JSON apply report; the empty string in dry-run.
+- `estimated-reclaimed-bytes` (since 0.2.0): best-effort estimate of the bytes the plan's eligible versions would
+  reclaim, summed from registry manifest sizes (config + layers, or child descriptors for indexes); the empty string
+  when registry inspection did not run.
 
 ## Plan and report artifacts
 
@@ -115,6 +123,8 @@ Plan reason codes (one per version):
   candidate again on future runs. Not a retention guarantee.
 - `ELIGIBLE_EPHEMERAL`
 - `ELIGIBLE_UNTAGGED`
+- `ELIGIBLE_ORPHAN_REFERRER` (since 0.2.0): referrer whose subjects are all confirmed absent, with
+  `delete-orphaned-referrers` enabled; `matchedRule` carries the absent subject digest.
 
 Apply outcomes (one per attempted deletion, recorded in the apply report without replacing the plan disposition): `deleted`, `absent`, `failed`.
 
@@ -128,11 +138,13 @@ Run abort codes (run-level, reported in the failure message and Step Summary):
 
 ## Reserved
 
-These names are reserved and not yet accepted; passing them has no effect:
+No names remain reserved as of 0.2.0. Resolution of the previously reserved names:
 
-- Input `delete-orphaned-referrers` and plan reason code `ELIGIBLE_ORPHAN_REFERRER`: orphan referrer cleanup stays disabled until fixtures prove safety (Implementation Plan, Iteration 5).
-- Input `ignore-missing-on-delete`: 404 responses during deletion are always treated as idempotent success (`absent`), so the flag is currently unnecessary.
-- Output `estimated-reclaimed-bytes`: pending size metadata support.
+- Input `delete-orphaned-referrers` and reason code `ELIGIBLE_ORPHAN_REFERRER`: implemented in 0.2.0 (see "OCI
+  safety").
+- Output `estimated-reclaimed-bytes`: implemented in 0.2.0 (see "Outputs").
+- Input `ignore-missing-on-delete`: **will not be implemented**. 404 responses during deletion are always treated as
+  idempotent success (`absent`), so the flag is unnecessary; the name is released.
 
 ## Matching semantics
 

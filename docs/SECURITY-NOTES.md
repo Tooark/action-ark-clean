@@ -23,5 +23,7 @@
   indexes and referrers of retained versions are protected, and any relation that cannot be proven fails closed as
   `PROTECTED_UNKNOWN_RELATION` — including full registry unavailability, which protects every eligible untagged version.
 - The registry pull token obtained for manifest inspection is scoped to `pull` on the single package.
-- Orphan referrer cleanup (`delete-orphaned-referrers`) is not implemented; the input name is reserved until fixtures prove safety.
+- Orphan referrer cleanup (`delete-orphaned-referrers`, default false) requires double proof of absence: every subject
+  missing from the inventory and a 404 from the registry for its manifest. Only weak retentions can be released; any
+  doubt keeps the referrer.
 - CI actions are pinned by full commit SHA; releases ship checksums, SBOM, and build provenance.
