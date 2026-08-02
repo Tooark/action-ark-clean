@@ -208,7 +208,6 @@ Se o Arklean economiza sua conta de armazenamento ou seus scripts de limpeza, co
 
 - [GitHub Sponsors](https://github.com/sponsors/paulosfjunior)
 - [Ko-fi](https://ko-fi.com/paulosfjunior)
-- [PayPal](https://www.paypal.com/donate/?business=62KETU4PXBWZC&no_recurring=0&currency_code=BRL)
 
 Toda contribuição ajuda a manter a família Tooark. Obrigado! 💙
 

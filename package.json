@@ -33,10 +33,6 @@
     {
       "type": "ko-fi",
       "url": "https://ko-fi.com/paulosfjunior"
-    },
-    {
-      "type": "paypal",
-      "url": "https://www.paypal.com/donate/?business=62KETU4PXBWZC&no_recurring=0&currency_code=BRL"
     }
   ],
   "engines": {

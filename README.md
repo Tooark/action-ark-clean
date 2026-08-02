@@ -214,7 +214,6 @@ If Arklean saves you storage bills or cleanup scripts, consider supporting the p
 
 - [GitHub Sponsors](https://github.com/sponsors/paulosfjunior)
 - [Ko-fi](https://ko-fi.com/paulosfjunior)
-- [PayPal](https://www.paypal.com/donate/?business=62KETU4PXBWZC&no_recurring=0&currency_code=BRL)
 
 Every contribution helps keep the Tooark family maintained. Thank you! 💙
 
