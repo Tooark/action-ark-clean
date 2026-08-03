@@ -51,7 +51,7 @@ const sbom = {
       scope: "excluded",
       name,
       version,
-      purl: `pkg:npm/${name.replace("@", "%40")}@${version}`,
+      purl: `pkg:npm/${name.replaceAll("@", "%40")}@${version}`,
     })),
   ],
 };
